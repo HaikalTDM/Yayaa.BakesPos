@@ -27,7 +27,7 @@ export default function PinSetup() {
       if (next.length === PIN_LENGTH) {
         const entered = next.join('')
         if (entered === digits.join('')) {
-          setPin(entered)
+          ;(async () => { await setPin(entered) })()
         } else {
           setStep('mismatch')
           setTimeout(() => {

@@ -17,14 +17,14 @@ export default function PinEntry({ onClose, onSuccess }: Props) {
   const [error, setError] = useState(false)
   const [showReset, setShowReset] = useState(false)
 
-  const handleDigit = (d: string) => {
+  const handleDigit = async (d: string) => {
     if (digits.length >= PIN_LENGTH) return
     const next = [...digits, d]
     setDigits(next)
     setError(false)
     if (next.length === PIN_LENGTH) {
       const entered = next.join('')
-      const ok = unlock(entered)
+      const ok = await unlock(entered)
       if (!ok) {
         setError(true)
         setDigits([])
@@ -39,8 +39,8 @@ export default function PinEntry({ onClose, onSuccess }: Props) {
     setError(false)
   }
 
-  const handleReset = () => {
-    resetPin()
+  const handleReset = async () => {
+    await resetPin()
     setTimeout(() => onClose(), 100)
   }
 

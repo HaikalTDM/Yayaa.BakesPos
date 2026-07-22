@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS stores (
   id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name       TEXT        NOT NULL,
   slug       TEXT        UNIQUE NOT NULL,
+  pin_hash   TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -172,7 +173,31 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ==========================================
--- 10. SEED PRODUCTS
+-- 10. RPC: PIN hash management (cross-device sync)
+-- ==========================================
+CREATE OR REPLACE FUNCTION set_store_pin(p_hash TEXT)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE stores SET pin_hash = p_hash
+  WHERE id = current_setting('app.current_store_id')::uuid;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_store_pin()
+RETURNS TEXT AS $$
+  SELECT pin_hash FROM stores WHERE id = current_setting('app.current_store_id')::uuid;
+$$ LANGUAGE sql STABLE;
+
+CREATE OR REPLACE FUNCTION clear_store_pin()
+RETURNS VOID AS $$
+BEGIN
+  UPDATE stores SET pin_hash = NULL
+  WHERE id = current_setting('app.current_store_id')::uuid;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ==========================================
+-- 11. SEED PRODUCTS
 -- ==========================================
 INSERT INTO products (store_id, name, price, stock, category)
 SELECT
