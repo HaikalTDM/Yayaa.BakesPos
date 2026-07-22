@@ -1,0 +1,39 @@
+import type { Metadata, Viewport } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Yayaa.Bakes · POS',
+  description: 'Micro-POS & Inventory Tracker for Yayaa.Bakes',
+  manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.png',
+    apple: '/favicon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'Yayaa.Bakes',
+    statusBarStyle: 'default',
+  },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#E8577A',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body className="bg-brand-bg text-brand-text font-sans antialiased min-h-dvh max-w-lg mx-auto overflow-x-hidden">
+        {children}
+      </body>
+    </html>
+  )
+}
