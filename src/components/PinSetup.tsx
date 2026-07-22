@@ -62,9 +62,9 @@ export default function PinSetup() {
         <div className="w-16 h-16 rounded-2xl bg-brand-pink/10 flex items-center justify-center mx-auto mb-4">
           <ShieldCheck className="w-8 h-8 text-brand-pink" strokeWidth={1.5} />
         </div>
-        <h1 className="text-xl font-extrabold text-brand-text mb-1">
-          Yayaa.Bakes
-        </h1>
+          <h1 className="text-xl font-bold text-[#F89EAE] mb-1" style={{ fontFamily: "'Dancing Script', cursive" }}>
+            yayaa.bakes
+          </h1>
         <p className={`text-sm font-medium ${step === 'mismatch' ? 'text-red-500' : 'text-brand-text/50'}`}>
           {label}
         </p>

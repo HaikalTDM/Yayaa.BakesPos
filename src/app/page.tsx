@@ -217,9 +217,9 @@ function POSApp() {
       <div className="flex-1 md:w-[68%] flex flex-col min-w-0">
         <header className="bg-white border-b border-pink-100 px-4 py-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Yayaa.Bakes" className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+            <img src="/logo.png" alt="yayaa.bakes" className="w-10 h-10 rounded-xl object-cover shadow-sm" />
             <div>
-              <h1 className="text-lg font-extrabold text-[#F89EAE] leading-tight">Yayaa.Bakes</h1>
+              <h1 className="text-lg font-bold text-[#F89EAE] leading-tight" style={{ fontFamily: "'Dancing Script', cursive" }}>yayaa.bakes</h1>
               <p className="text-[10px] text-[#333333]/40 font-medium">Micro-POS</p>
             </div>
           </div>

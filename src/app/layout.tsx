@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Yayaa.Bakes · POS',
-  description: 'Micro-POS & Inventory Tracker for Yayaa.Bakes',
+  title: 'yayaa.bakes · POS',
+  description: 'Micro-POS & Inventory Tracker for yayaa.bakes',
   manifest: '/manifest.json',
   icons: {
     icon: '/favicon.png',
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Yayaa.Bakes',
+    title: 'yayaa.bakes',
     statusBarStyle: 'default',
   },
 }
@@ -31,6 +31,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;600;700&display=swap" rel="stylesheet" />
+      </head>
       <body className="bg-[#FBFAF2] text-brand-text font-sans antialiased min-h-dvh md:h-dvh md:overflow-hidden">
         {children}
       </body>
