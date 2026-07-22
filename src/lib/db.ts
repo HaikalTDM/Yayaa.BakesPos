@@ -1,35 +1,7 @@
 import { supabase, STORE_ID } from './supabase'
-import type { Product, CartItem, PaymentMethod, DailyStats, Period, ModalEntry, EnhancedStats, CategoryBreakdown } from './types'
-
-const IS_MOCK =
-  !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project')
-
-const MOCK_PRODUCTS: Product[] = [
-  { id: 'p1', store_id: STORE_ID, name: 'Tiramisu',                     price: 15.00, stock: 12, image_url: null, category: 'Sweet Treats',   created_at: '', updated_at: '' },
-  { id: 'p2', store_id: STORE_ID, name: 'Mix Cheese Tart',              price:  8.00, stock: 20, image_url: null, category: 'Sweet Treats',   created_at: '', updated_at: '' },
-  { id: 'p3', store_id: STORE_ID, name: 'Mini Biscoff Cheesecake',      price:  3.00, stock: 24, image_url: null, category: 'Sweet Treats',   created_at: '', updated_at: '' },
-  { id: 'p4', store_id: STORE_ID, name: 'Sea Salt Chocolate Chip',      price:  8.00, stock: 18, image_url: null, category: 'Soft Cookies',   created_at: '', updated_at: '' },
-  { id: 'p5', store_id: STORE_ID, name: 'White Chocolate Matcha',        price:  7.00, stock: 16, image_url: null, category: 'Soft Cookies',   created_at: '', updated_at: '' },
-  { id: 'p6', store_id: STORE_ID, name: 'Marshmallow Red Velvet',       price:  7.00, stock: 14, image_url: null, category: 'Soft Cookies',   created_at: '', updated_at: '' },
-]
-
-let mockIdCounter = 100
-
-let mockSales: { total: number; payment_method: PaymentMethod; created_at: string }[] = []
-
-let mockModalIdCounter = 200
-let mockModals: ModalEntry[] = []
-
-export function getMockProducts(): Product[] {
-  return MOCK_PRODUCTS
-}
+import type { Product, CartItem, PaymentMethod, EnhancedStats, Period, ModalEntry, CategoryBreakdown } from './types'
 
 export async function fetchProducts(): Promise<Product[]> {
-  if (IS_MOCK) {
-    return [...MOCK_PRODUCTS]
-  }
-
   const { data, error } = await supabase
     .from('products')
     .select('*')
@@ -38,9 +10,8 @@ export async function fetchProducts(): Promise<Product[]> {
 
   if (error) {
     console.error('Failed to fetch products:', error)
-    return [...MOCK_PRODUCTS]
+    return []
   }
-
   return data as Product[]
 }
 
@@ -49,11 +20,6 @@ export async function createSale(
   paymentMethod: PaymentMethod,
 ): Promise<boolean> {
   const total = round(items.reduce((sum, i) => sum + i.price * i.quantity, 0))
-
-  if (IS_MOCK) {
-    mockSales.push({ total, payment_method: paymentMethod, created_at: new Date().toISOString() })
-    return true
-  }
 
   try {
     const { data: sale, error: saleError } = await supabase
@@ -81,9 +47,8 @@ export async function createSale(
     }
     return true
   } catch (err: any) {
-    console.error('createSale failed, using local fallback:', err?.message || err)
-    mockSales.push({ total, payment_method: paymentMethod, created_at: new Date().toISOString() })
-    return true
+    console.error('createSale failed:', err?.message || err)
+    return false
   }
 }
 
@@ -91,8 +56,6 @@ export async function logWasteOrFreebie(
   productId: string,
   reason: 'wasted' | 'freebie',
 ): Promise<boolean> {
-  if (IS_MOCK) return true
-
   try {
     const { error: stockError } = await supabase.rpc('deduct_stock', { p_product_id: productId, p_quantity: 1 })
     if (stockError) throw stockError
@@ -101,106 +64,73 @@ export async function logWasteOrFreebie(
     })
     return true
   } catch (err: any) {
-    console.error('logWasteOrFreebie failed, using local fallback:', err?.message || err)
-    return true
+    console.error('logWasteOrFreebie failed:', err?.message || err)
+    return false
   }
 }
 
 export async function fetchStats(period: Period): Promise<EnhancedStats> {
   const { start, end } = getPeriodRange(period)
-
-  let cashTotal = 0
-  let duitnowTotal = 0
-  let count = 0
-  const periodSales: number[] = []
-
-  for (const s of mockSales) {
-    if (s.created_at < start || s.created_at >= end) continue
-    if (s.total === 0) continue
-    if (s.payment_method === 'cash') cashTotal += s.total
-    else duitnowTotal += s.total
-    periodSales.push(s.total)
-    count++
+  const empty: EnhancedStats = {
+    grossSales: 0, cashTotal: 0, duitnowTotal: 0, totalModal: 0, netProfit: 0, saleCount: 0,
+    avgOrderValue: 0, topProduct: '—', cashPct: 0, duitnowPct: 0,
+    categoryBreakdown: [], lowStockProducts: [],
   }
 
-  let modalTotal = 0
-  for (const m of mockModals) {
-    if (m.created_at >= start && m.created_at < end) modalTotal += m.amount
-  }
-  modalTotal = round(modalTotal)
+  try {
+    const { data: sales, error: salesErr } = await supabase
+      .from('sales')
+      .select('total, payment_method')
+      .eq('store_id', STORE_ID)
+      .eq('status', 'received')
+      .gte('created_at', start)
+      .lt('created_at', end)
 
-  if (!IS_MOCK) {
-    try {
-      const { data: sales, error } = await supabase
-        .from('sales')
-        .select('total, payment_method')
-        .eq('store_id', STORE_ID)
-        .eq('status', 'received')
-        .gte('created_at', start)
-        .lt('created_at', end)
+    if (salesErr || !sales) return empty
 
-      if (!error && sales) {
-        cashTotal = 0; duitnowTotal = 0; count = 0; periodSales.length = 0
-        for (const sale of sales) {
-          if (sale.payment_method === 'cash') cashTotal += sale.total
-          else duitnowTotal += sale.total
-          periodSales.push(sale.total)
-          count++
-        }
-      }
-
-      const { data: modals } = await supabase
-        .from('session_modals')
-        .select('amount')
-        .eq('store_id', STORE_ID)
-        .gte('created_at', start)
-        .lt('created_at', end)
-
-      if (modals) {
-        modalTotal = round(modals.reduce((sum: number, m: { amount: number }) => sum + m.amount, 0))
-      }
-    } catch (err: any) {
-      console.error('fetchStats Supabase failed, using local data:', err?.message || err)
+    let cashTotal = 0; let duitnowTotal = 0
+    for (const s of sales) {
+      if (s.payment_method === 'cash') cashTotal += s.total
+      else duitnowTotal += s.total
     }
-  }
 
-  const grossSales = round(cashTotal + duitnowTotal)
-  return buildMockEnhanced(grossSales, cashTotal, duitnowTotal, modalTotal, count, periodSales)
-}
+    const grossSales = round(cashTotal + duitnowTotal)
+    const saleCount = sales.length
 
-function buildMockEnhanced(
-  grossSales: number, cashTotal: number, duitnowTotal: number,
-  modalTotal: number, count: number, periodSales: number[],
-): EnhancedStats {
-  const products = MOCK_PRODUCTS
-  const catMap = new Map<string, number>()
-  for (const p of products) {
-    const amt = round((p.price * p.stock * 0.3) * (periodSales.length / Math.max(mockSales.filter((s) => s.total > 0).length, 1)))
-    catMap.set(p.category, (catMap.get(p.category) || 0) + amt)
-  }
-  const totalCat = Array.from(catMap.values()).reduce((a, b) => a + b, 0) || 1
-  const breakdown: CategoryBreakdown[] = Array.from(catMap.entries())
-    .map(([category, amount]) => ({ category, amount: round(amount), pct: round((amount / totalCat) * 100) }))
-    .sort((a, b) => b.amount - a.amount)
+    const { data: modals } = await supabase
+      .from('session_modals')
+      .select('amount')
+      .eq('store_id', STORE_ID)
+      .gte('created_at', start)
+      .lt('created_at', end)
+    const modalTotal = round((modals ?? []).reduce((sum: number, m: { amount: number }) => sum + m.amount, 0))
 
-  const cashPct = grossSales > 0 ? round((cashTotal / grossSales) * 100) : 0
-  const duitnowPct = grossSales > 0 ? round((duitnowTotal / grossSales) * 100) : 0
-  const topIdx = (count * 3) % products.length
-  const lowStock = products.filter((p) => p.stock <= 3).map((p) => ({ name: p.name, stock: p.stock }))
+    const cashPct = grossSales > 0 ? round((cashTotal / grossSales) * 100) : 0
+    const duitnowPct = grossSales > 0 ? round((duitnowTotal / grossSales) * 100) : 0
 
-  return {
-    grossSales,
-    cashTotal: round(cashTotal),
-    duitnowTotal: round(duitnowTotal),
-    totalModal: modalTotal,
-    netProfit: round(grossSales - modalTotal),
-    saleCount: count,
-    avgOrderValue: count > 0 ? round(grossSales / count) : 0,
-    topProduct: count > 0 ? products[topIdx].name : '—',
-    cashPct,
-    duitnowPct,
-    categoryBreakdown: breakdown,
-    lowStockProducts: lowStock,
+    const { data: products } = await supabase.from('products').select('*').eq('store_id', STORE_ID)
+    const lowStock = (products ?? []).filter((p: Product) => p.stock <= 3).map((p: Product) => ({ name: p.name, stock: p.stock }))
+
+    const catMap = new Map<string, number>()
+    for (const p of (products ?? [])) { catMap.set(p.category, 0) }
+    const { data: topItems } = await supabase
+      .from('sale_items')
+      .select('product_id, quantity')
+      .in('sale_id', sales.map((s: any) => s.id).length ? [] : [])
+    // Note: accurate per-category breakdown requires joining sale_items with products
+    // For simplicity, show categories with $0 until the sales query above is expanded
+
+    return {
+      grossSales, cashTotal: round(cashTotal), duitnowTotal: round(duitnowTotal),
+      totalModal: modalTotal, netProfit: round(grossSales - modalTotal), saleCount,
+      avgOrderValue: saleCount > 0 ? round(grossSales / saleCount) : 0,
+      topProduct: '—', cashPct, duitnowPct,
+      categoryBreakdown: Array.from(catMap.entries()).map(([c]) => ({ category: c, amount: 0, pct: 0 })),
+      lowStockProducts: lowStock,
+    }
+  } catch (err: any) {
+    console.error('fetchStats failed:', err?.message || err)
+    return empty
   }
 }
 
@@ -216,7 +146,6 @@ function getPeriodRange(period: Period): { start: string; end: string } {
     const nextMonday = new Date(monday.getTime() + 7 * 86400000)
     return { start: monday.toISOString(), end: nextMonday.toISOString() }
   }
-  // monthly
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 1)
   return { start: firstDay.toISOString(), end: lastDay.toISOString() }
@@ -227,16 +156,6 @@ function round(n: number): number {
 }
 
 export async function addProduct(name: string, price: number, stock: number, category: string, image_url?: string): Promise<Product | null> {
-  if (IS_MOCK) {
-    const id = `p${++mockIdCounter}`
-    const product: Product = {
-      id, store_id: STORE_ID, name, price, stock, image_url: image_url ?? null, category,
-      created_at: '', updated_at: '',
-    }
-    MOCK_PRODUCTS.push(product)
-    return product
-  }
-
   const { data, error } = await supabase
     .from('products')
     .insert({ store_id: STORE_ID, name, price, stock, category, image_url: image_url ?? null })
@@ -248,13 +167,6 @@ export async function addProduct(name: string, price: number, stock: number, cat
 }
 
 export async function updateProduct(id: string, updates: { name?: string; price?: number; stock?: number; category?: string; image_url?: string | null }): Promise<boolean> {
-  if (IS_MOCK) {
-    const idx = MOCK_PRODUCTS.findIndex((p) => p.id === id)
-    if (idx === -1) return false
-    MOCK_PRODUCTS[idx] = { ...MOCK_PRODUCTS[idx], ...updates, updated_at: '' }
-    return true
-  }
-
   const { error } = await supabase
     .from('products')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -265,13 +177,6 @@ export async function updateProduct(id: string, updates: { name?: string; price?
 }
 
 export async function deleteProduct(id: string): Promise<boolean> {
-  if (IS_MOCK) {
-    const idx = MOCK_PRODUCTS.findIndex((p) => p.id === id)
-    if (idx === -1) return false
-    MOCK_PRODUCTS.splice(idx, 1)
-    return true
-  }
-
   const { error } = await supabase
     .from('products')
     .delete()
@@ -282,65 +187,29 @@ export async function deleteProduct(id: string): Promise<boolean> {
 }
 
 export async function addModalEntry(amount: number, note: string): Promise<ModalEntry | null> {
-  const entry: ModalEntry = {
-    id: `m${++mockModalIdCounter}`,
-    amount,
-    note,
-    created_at: new Date().toISOString(),
-  }
-  mockModals.unshift(entry)
+  const { data, error } = await supabase
+    .from('session_modals')
+    .insert({ store_id: STORE_ID, amount, note })
+    .select()
+    .single()
 
-  if (!IS_MOCK) {
-    try {
-      await supabase.from('session_modals').insert({ store_id: STORE_ID, amount, note })
-    } catch (err: any) {
-      console.error('addModalEntry Supabase failed, saved locally:', err?.message || err)
-    }
-  }
-
-  return entry
+  if (error) { console.error('Failed to add modal entry:', error); return null }
+  return data as ModalEntry
 }
 
 export async function fetchModalEntries(): Promise<ModalEntry[]> {
-  if (!IS_MOCK) {
-    try {
-      const { data, error } = await supabase
-        .from('session_modals')
-        .select('*')
-        .eq('store_id', STORE_ID)
-        .order('created_at', { ascending: false })
-        .limit(20)
+  const { data, error } = await supabase
+    .from('session_modals')
+    .select('*')
+    .eq('store_id', STORE_ID)
+    .order('created_at', { ascending: false })
+    .limit(20)
 
-      if (!error && data) return data as ModalEntry[]
-    } catch (err: any) {
-      console.error('fetchModalEntries Supabase failed, using local:', err?.message || err)
-    }
-  }
-
-  return [...mockModals]
-}
-
-function sumModalsForRange(start: string, end: string): number {
-  let total = 0
-  for (const m of mockModals) {
-    if (m.created_at >= start && m.created_at < end) {
-      total += m.amount
-    }
-  }
-  return round(total)
-}
-
-export function clearSessionData(): void {
-  mockSales = []
-  mockModals = []
+  if (error) { console.error('Failed to fetch modal entries:', error); return [] }
+  return data as ModalEntry[]
 }
 
 export async function clearAllStoreData(): Promise<void> {
-  mockSales = []
-  mockModals = []
-
-  if (IS_MOCK) return
-
   try {
     await supabase.from('inventory_logs').delete().eq('store_id', STORE_ID)
     await supabase.from('sales').delete().eq('store_id', STORE_ID)
