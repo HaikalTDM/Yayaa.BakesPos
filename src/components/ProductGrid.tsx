@@ -27,20 +27,18 @@ export default function ProductGrid({ products, onAddToCart, onLongPress }: Prop
   }, [products])
 
   return (
-    <div className="p-4 pb-24 md:pb-8 space-y-5">
+    <div className="px-4 py-4 space-y-5">
       {sections.map(([category, items]) => (
         <div key={category}>
           <div className="mb-3">
-            <h3 className="text-sm font-extrabold text-brand-text">
-              {category}
-            </h3>
+            <h3 className="text-sm font-extrabold text-[#333333]">{category}</h3>
             {SECTION_DESCRIPTIONS[category] && (
-              <p className="text-[11px] text-brand-text/35 font-medium mt-0.5">
+              <p className="text-[11px] text-[#333333]/40 font-medium mt-0.5">
                 {SECTION_DESCRIPTIONS[category]}
               </p>
             )}
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-3 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {items.map((product) => (
               <ProductCard
                 key={product.id}

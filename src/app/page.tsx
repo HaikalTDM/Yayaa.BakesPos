@@ -214,167 +214,113 @@ function POSApp() {
   }, [])
 
   return (
-    <div className="min-h-dvh flex flex-col relative">
-      {/* Header */}
-      <header className="bg-white border-b border-brand-pink/15 px-4 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <img
-            src="/logo.png"
-            alt="Yayaa.Bakes"
-            className="w-10 h-10 rounded-xl object-cover shadow-sm"
-          />
-          <div>
-            <h1 className="text-lg font-extrabold text-brand-pink leading-tight">
-              Yayaa.Bakes
-            </h1>
-            <p className="text-[10px] text-brand-text/40 font-medium">
-              Micro-POS
-            </p>
-          </div>
-        </div>
-        {activeTab === 'checkout' && cart.length > 0 && (
-          <div className="bg-brand-pink text-white text-xs font-bold px-3 py-1.5 rounded-full">
-            {cart.reduce((s, i) => s + i.quantity, 0)} items
-          </div>
-        )}
-      </header>
-
-      {/* Tab Bar */}
-      <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
-
-      {/* Content */}
-      <main className="flex-1 overflow-y-auto md:pr-80">
-        {activeTab === 'checkout' && (
-          loading ? (
-            <div className="grid grid-cols-3 gap-3 p-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="aspect-square rounded-2xl bg-white animate-pulse" />
-              ))}
+    <div className="min-h-dvh md:h-dvh flex flex-col md:flex-row md:overflow-hidden">
+      {/* LEFT PANEL — products, summary, product manager */}
+      <div className="flex-1 md:w-[68%] flex flex-col min-w-0">
+        <header className="bg-white border-b border-pink-100 px-4 py-3 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Yayaa.Bakes" className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+            <div>
+              <h1 className="text-lg font-extrabold text-[#F89EAE] leading-tight">Yayaa.Bakes</h1>
+              <p className="text-[10px] text-[#333333]/40 font-medium">Micro-POS</p>
             </div>
-          ) : (
-            <ProductGrid
-              products={products}
-              onAddToCart={handleAddToCart}
-              onLongPress={handleLongPress}
-            />
-          )
-        )}
-        {activeTab === 'reconciliation' && <ReconciliationDashboard />}
-        {activeTab === 'products' && (
-          <ProductManager
-            products={products}
-            onRefresh={loadProducts}
-            showToast={showToast}
-          />
-        )}
-      </main>
+          </div>
+          {activeTab === 'checkout' && cart.length > 0 && (
+            <div className="bg-[#F89EAE] text-white text-xs font-bold px-3 py-1.5 rounded-full">
+              {cart.reduce((s, i) => s + i.quantity, 0)} items
+            </div>
+          )}
+        </header>
 
-      {/* Cart Panel & Payment Flow (checkout tab only) */}
+        <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
+
+        <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
+          {activeTab === 'checkout' && (
+            loading ? (
+              <div className="grid grid-cols-3 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="aspect-square md:h-24 rounded-2xl bg-white animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <ProductGrid products={products} onAddToCart={handleAddToCart} onLongPress={handleLongPress} />
+            )
+          )}
+          {activeTab === 'reconciliation' && <ReconciliationDashboard />}
+          {activeTab === 'products' && (
+            <ProductManager products={products} onRefresh={loadProducts} showToast={showToast} />
+          )}
+        </main>
+      </div>
+
+      {/* MOBILE CART — fixed bottom sheet */}
       {activeTab === 'checkout' && flowStep === 'cart' && (
-        <CartPanel
-          onProceed={handleProceedToPayment}
-          onBack={resetCheckout}
-        />
+        <div className="md:hidden">
+          <CartPanel onProceed={handleProceedToPayment} onBack={resetCheckout} variant="inline" />
+        </div>
       )}
 
+      {/* TABLET CART — sidebar */}
+      {activeTab === 'checkout' && (
+        <div className="hidden md:flex w-[32%] border-l border-pink-100 bg-white flex-col h-full shrink-0">
+          <CartPanel onProceed={handleProceedToPayment} onBack={resetCheckout} variant="sidebar" />
+        </div>
+      )}
+
+      {/* Payment modal */}
       {activeTab === 'checkout' && flowStep === 'payment' && selectedPayment === null && (
-        <PaymentButtons
-          total={cartTotal}
-          onSelect={handleSelectPayment}
-          onBack={handleBackToCart}
-        />
+        <PaymentButtons total={cartTotal} onSelect={handleSelectPayment} onBack={handleBackToCart} />
       )}
 
+      {/* QR modal */}
       {activeTab === 'checkout' && flowStep === 'qr' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in">
           <div className="relative w-full max-w-xs bg-white rounded-3xl px-5 pt-8 pb-6 shadow-2xl animate-in zoom-in-95 mx-4">
-            {/* Cat ears on QR modal too */}
-            <div className="absolute -top-4 left-8 w-0 h-0 border-l-[16px] border-r-[16px] border-b-[18px] border-l-transparent border-r-transparent border-b-brand-pink" />
-            <div className="absolute -top-4 right-8 w-0 h-0 border-l-[16px] border-r-[16px] border-b-[18px] border-l-transparent border-r-transparent border-b-brand-pink" />
+            <div className="absolute -top-4 left-8 w-0 h-0 border-l-[16px] border-r-[16px] border-b-[18px] border-l-transparent border-r-transparent border-b-[#F89EAE]" />
+            <div className="absolute -top-4 right-8 w-0 h-0 border-l-[16px] border-r-[16px] border-b-[18px] border-l-transparent border-r-transparent border-b-[#F89EAE]" />
             <div className="absolute -top-3 left-[38px] w-0 h-0 border-l-[10px] border-r-[10px] border-b-[12px] border-l-transparent border-r-transparent border-b-white" />
             <div className="absolute -top-3 right-[38px] w-0 h-0 border-l-[10px] border-r-[10px] border-b-[12px] border-l-transparent border-r-transparent border-b-white" />
-
-            <h2 className="text-lg font-extrabold text-center text-brand-text mb-1">
-              Scan to Pay
-            </h2>
-            <p className="text-xs text-center text-brand-text/50 mb-4">
-              Show this QR to your customer
-            </p>
-
-            <div className="bg-brand-bg rounded-2xl p-3 mb-4">
-              <img
-                src="/yayaqr.jpeg"
-                alt="DuitNow QR"
-                className="w-full rounded-xl"
-              />
+            <h2 className="text-lg font-extrabold text-center text-[#333333] mb-1">Scan to Pay</h2>
+            <p className="text-xs text-center text-[#333333]/50 mb-4">Show this QR to your customer</p>
+            <div className="bg-pink-50 rounded-2xl p-3 mb-4">
+              <img src="/yayaqr.jpeg" alt="DuitNow QR" className="w-full rounded-xl" />
             </div>
-
-            <p className="text-center text-sm font-bold text-brand-text mb-4">
-              RM {cartTotal.toFixed(2)}
-            </p>
-
+            <p className="text-center text-sm font-bold text-[#333333] mb-4">RM {cartTotal.toFixed(2)}</p>
             <div className="flex gap-3">
-              <button
-                onClick={handleCancelCheckout}
-                className="flex-1 py-3.5 rounded-2xl border-2 border-red-200 text-red-500 font-bold text-sm active:bg-red-50 transition-colors flex items-center justify-center gap-1"
-              >
-                <X className="w-4 h-4" strokeWidth={2.5} />
-                CANCEL
+              <button onClick={handleCancelCheckout} className="flex-1 py-3.5 rounded-2xl border-2 border-red-200 text-red-500 font-bold text-sm active:bg-red-50 transition-colors flex items-center justify-center gap-1">
+                <X className="w-4 h-4" strokeWidth={2.5} /> CANCEL
               </button>
               <button
                 onClick={handleQrDone}
                 disabled={checkoutLoading}
-                className="flex-[2] py-3.5 rounded-2xl bg-brand-pink text-white font-bold text-sm active:bg-brand-pink/80 transition-colors shadow-md flex items-center justify-center gap-1 disabled:opacity-50"
+                className="flex-[2] py-3.5 rounded-2xl bg-[#F89EAE] text-white font-bold text-sm active:bg-[#E8577A] transition-colors shadow-md flex items-center justify-center gap-1 disabled:opacity-50"
               >
-                {checkoutLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2.5} />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" strokeWidth={2.5} />
-                    PAID / DONE
-                  </>
-                )}
+                {checkoutLoading ? <><Loader2 className="w-4 h-4 animate-spin" strokeWidth={2.5} /> Processing...</> : <><Check className="w-4 h-4" strokeWidth={2.5} /> PAID / DONE</>}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Confirmation modal */}
       {activeTab === 'checkout' && flowStep === 'confirm' && selectedPayment && (
-        <CheckoutModal
-          paymentMethod={selectedPayment}
-          total={cartTotal}
-          onConfirm={handleConfirmCheckout}
-          onCancel={handleCancelCheckout}
-          loading={checkoutLoading}
-        />
+        <CheckoutModal paymentMethod={selectedPayment} total={cartTotal} onConfirm={handleConfirmCheckout} onCancel={handleCancelCheckout} loading={checkoutLoading} />
       )}
 
       {/* Long Press Popup */}
       {longPressTarget && (
-        <LongPressPopup
-          product={longPressTarget}
-          position={popupPosition}
-          onWasted={handleWasted}
-          onFreebie={handleFreebie}
-          onClose={() => setLongPressTarget(null)}
-        />
+        <LongPressPopup product={longPressTarget} position={popupPosition} onWasted={handleWasted} onFreebie={handleFreebie} onClose={() => setLongPressTarget(null)} />
       )}
 
       {/* Toast */}
       {toast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] bg-brand-text text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-lg animate-in slide-in-from-top-2 fade-in">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] bg-[#333333] text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-lg animate-in slide-in-from-top-2 fade-in">
           {toast}
         </div>
       )}
 
       {hasPin && !pinExists && <PinSetup />}
-      {showPinEntry && (
-        <PinEntry onClose={handleClosePinEntry} onSuccess={onPinSuccess} />
-      )}
+      {showPinEntry && <PinEntry onClose={handleClosePinEntry} onSuccess={onPinSuccess} />}
     </div>
   )
 }

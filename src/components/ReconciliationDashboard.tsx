@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   RefreshCw, Plus, TrendingUp, ShoppingBag,
-  DollarSign, AlertTriangle, Package,
+  DollarSign, AlertTriangle, Trash2,
 } from 'lucide-react'
-import { fetchStats, addModalEntry, fetchModalEntries } from '@/lib/db'
+import { fetchStats, addModalEntry, fetchModalEntries, clearAllStoreData } from '@/lib/db'
 import type { EnhancedStats, Period, ModalEntry } from '@/lib/types'
 
 const PERIODS: { key: Period; label: string }[] = [
@@ -51,6 +51,12 @@ export default function ReconciliationDashboard() {
       setShowModalForm(false)
       loadAll()
     }
+  }
+
+  const handleClearData = async () => {
+    if (!confirm('Clear all sales and modal data? This cannot be undone.')) return
+    await clearAllStoreData()
+    loadAll()
   }
 
   const periodLabel =
@@ -309,6 +315,14 @@ export default function ReconciliationDashboard() {
       >
         <RefreshCw className="w-4 h-4" strokeWidth={2} />
         Refresh
+      </button>
+
+      <button
+        onClick={handleClearData}
+        className="w-full mt-2 py-3 rounded-2xl border-2 border-red-200 text-red-400 font-semibold text-sm active:bg-red-50 transition-colors flex items-center justify-center gap-2"
+      >
+        <Trash2 className="w-4 h-4" strokeWidth={2} />
+        Start Fresh
       </button>
     </div>
   )

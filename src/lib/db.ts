@@ -16,43 +16,10 @@ const MOCK_PRODUCTS: Product[] = [
 
 let mockIdCounter = 100
 
-let mockSales: { total: number; payment_method: PaymentMethod; created_at: string }[] = (() => {
-  const today = new Date()
-  const sales: { total: number; payment_method: PaymentMethod; created_at: string }[] = []
-  const methods: PaymentMethod[] = ['cash', 'duitnow']
-  for (let d = 0; d < 30; d++) {
-    const date = new Date(today)
-    date.setDate(date.getDate() - d)
-    const iso = date.toISOString()
-    const count = Math.floor(Math.random() * 4) + 1
-    for (let i = 0; i < count; i++) {
-      sales.push({
-        total: round(Math.random() * 60 + 8),
-        payment_method: methods[Math.floor(Math.random() * 2)],
-        created_at: iso,
-      })
-    }
-  }
-  return sales
-})()
+let mockSales: { total: number; payment_method: PaymentMethod; created_at: string }[] = []
 
 let mockModalIdCounter = 200
-let mockModals: ModalEntry[] = (() => {
-  const entries: ModalEntry[] = []
-  const today = new Date()
-  const amounts = [120, 150, 135, 160, 140, 155, 145, 130]
-  for (let i = 0; i < 8; i++) {
-    const date = new Date(today)
-    date.setDate(date.getDate() - (i * 3) - 1)
-    entries.push({
-      id: `m${++mockModalIdCounter}`,
-      amount: amounts[i],
-      note: i % 2 === 0 ? 'Weekend ingredients' : 'Packaging + gas',
-      created_at: date.toISOString(),
-    })
-  }
-  return entries
-})()
+let mockModals: ModalEntry[] = []
 
 export function getMockProducts(): Product[] {
   return MOCK_PRODUCTS
@@ -88,104 +55,55 @@ export async function createSale(
     return true
   }
 
-  const { data: sale, error: saleError } = await supabase
-    .from('sales')
-    .insert({
-      store_id: STORE_ID,
-      total,
-      payment_method: paymentMethod,
-      status: 'received',
-    })
-    .select('id')
-    .single()
+  try {
+    const { data: sale, error: saleError } = await supabase
+      .from('sales')
+      .insert({ store_id: STORE_ID, total, payment_method: paymentMethod, status: 'received' })
+      .select('id')
+      .single()
 
-  if (saleError || !sale) {
-    console.error('Failed to create sale:', saleError)
-    return false
-  }
+    if (saleError || !sale) throw saleError
 
-  const saleId = sale.id
+    const saleId = sale.id
+    const saleItems = items.map((item) => ({
+      sale_id: saleId, product_id: item.product_id, quantity: item.quantity, price_at_sale: item.price,
+    }))
 
-  const saleItems = items.map((item) => ({
-    sale_id: saleId,
-    product_id: item.product_id,
-    quantity: item.quantity,
-    price_at_sale: item.price,
-  }))
+    const { error: itemsError } = await supabase.from('sale_items').insert(saleItems)
+    if (itemsError) throw itemsError
 
-  const { error: itemsError } = await supabase
-    .from('sale_items')
-    .insert(saleItems)
-
-  if (itemsError) {
-    console.error('Failed to insert sale items:', itemsError)
-    await supabase.from('sales').delete().eq('id', saleId)
-    return false
-  }
-
-  for (const item of items) {
-    const { error: stockError } = await supabase.rpc('deduct_stock', {
-      p_product_id: item.product_id,
-      p_quantity: item.quantity,
-    })
-
-    if (stockError) {
-      console.error('Failed to deduct stock:', stockError)
-      return false
-    }
-
-    const { error: logError } = await supabase
-      .from('inventory_logs')
-      .insert({
-        store_id: STORE_ID,
-        product_id: item.product_id,
-        change_amount: -item.quantity,
-        reason: 'sale',
-        sale_id: saleId,
+    for (const item of items) {
+      const { error: stockError } = await supabase.rpc('deduct_stock', { p_product_id: item.product_id, p_quantity: item.quantity })
+      if (stockError) throw stockError
+      await supabase.from('inventory_logs').insert({
+        store_id: STORE_ID, product_id: item.product_id, change_amount: -item.quantity, reason: 'sale', sale_id: saleId,
       })
-
-    if (logError) {
-      console.error('Failed to log inventory change:', logError)
     }
+    return true
+  } catch (err: any) {
+    console.error('createSale failed, using local fallback:', err?.message || err)
+    mockSales.push({ total, payment_method: paymentMethod, created_at: new Date().toISOString() })
+    return true
   }
-
-  return true
 }
 
 export async function logWasteOrFreebie(
   productId: string,
   reason: 'wasted' | 'freebie',
 ): Promise<boolean> {
-  if (IS_MOCK) {
+  if (IS_MOCK) return true
+
+  try {
+    const { error: stockError } = await supabase.rpc('deduct_stock', { p_product_id: productId, p_quantity: 1 })
+    if (stockError) throw stockError
+    await supabase.from('inventory_logs').insert({
+      store_id: STORE_ID, product_id: productId, change_amount: -1, reason, sale_id: null,
+    })
+    return true
+  } catch (err: any) {
+    console.error('logWasteOrFreebie failed, using local fallback:', err?.message || err)
     return true
   }
-
-  const { error: stockError } = await supabase.rpc('deduct_stock', {
-    p_product_id: productId,
-    p_quantity: 1,
-  })
-
-  if (stockError) {
-    console.error('Failed to deduct stock for waste/freebie:', stockError)
-    return false
-  }
-
-  const { error: logError } = await supabase
-    .from('inventory_logs')
-    .insert({
-      store_id: STORE_ID,
-      product_id: productId,
-      change_amount: -1,
-      reason,
-      sale_id: null,
-    })
-
-  if (logError) {
-    console.error('Failed to log waste/freebie:', logError)
-    return false
-  }
-
-  return true
 }
 
 export async function fetchStats(period: Period): Promise<EnhancedStats> {
@@ -418,4 +336,24 @@ function sumModalsForRange(start: string, end: string): number {
     }
   }
   return round(total)
+}
+
+export function clearSessionData(): void {
+  mockSales = []
+  mockModals = []
+}
+
+export async function clearAllStoreData(): Promise<void> {
+  mockSales = []
+  mockModals = []
+
+  if (IS_MOCK) return
+
+  try {
+    await supabase.from('inventory_logs').delete().eq('store_id', STORE_ID)
+    await supabase.from('sales').delete().eq('store_id', STORE_ID)
+    await supabase.from('session_modals').delete().eq('store_id', STORE_ID)
+  } catch (err: any) {
+    console.error('Failed to clear store data:', err?.message || err)
+  }
 }

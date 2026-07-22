@@ -51,8 +51,8 @@ function TabButton({
         flex-1 py-3 text-sm font-bold rounded-t-xl transition-all duration-150 flex items-center justify-center gap-1.5
         ${
           active
-            ? 'bg-brand-bg text-brand-pink'
-            : 'text-brand-text/40 hover:text-brand-text/60'
+            ? 'bg-[#FBFAF2] text-[#F89EAE]'
+            : 'text-[#333333]/40 hover:text-[#333333]/60'
         }
       `}
     >
