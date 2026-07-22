@@ -165,7 +165,22 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ==========================================
--- 10. RPC: PIN hash management (cross-device sync)
+-- 9b. RPC: Add stock (restock)
+-- ==========================================
+CREATE OR REPLACE FUNCTION add_stock(p_product_id UUID, p_quantity INTEGER)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE products
+  SET stock = stock + p_quantity, updated_at = NOW()
+  WHERE id = p_product_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Product % not found', p_product_id;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ==========================================
 -- ==========================================
 CREATE OR REPLACE FUNCTION set_store_pin(p_hash TEXT)
 RETURNS VOID AS $$

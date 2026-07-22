@@ -5,7 +5,7 @@ import { X, Check, Loader2, CakeSlice } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { CartProvider, useCart } from '@/hooks/useCart'
 import { PinProvider, usePinLock } from '@/hooks/usePinLock'
-import { fetchProducts, createSale, logWasteOrFreebie } from '@/lib/db'
+import { fetchProducts, createSale, logWasteOrFreebie, restockProduct } from '@/lib/db'
 import { showToast } from '@/components/Toast'
 import type { Product, PaymentMethod, Tab } from '@/lib/types'
 import TabBar from '@/components/TabBar'
@@ -228,6 +228,20 @@ function POSApp() {
     [updateLocalStock],
   )
 
+  const handleRestock = useCallback(
+    async (product: Product, quantity: number) => {
+      setLongPressTarget(null)
+      const ok = await restockProduct(product.id, quantity)
+      if (ok) {
+        updateLocalStock(product.id, quantity)
+        showToast(`${product.name} — restocked +${quantity}`)
+      } else {
+        showToast('Failed to restock')
+      }
+    },
+    [updateLocalStock],
+  )
+
   // Checkout flow handlers
   const handleProceedToPayment = useCallback(() => {
     setFlowStep('payment')
@@ -421,7 +435,7 @@ function POSApp() {
 
       {/* Long Press Popup */}
       {longPressTarget && (
-        <LongPressPopup product={longPressTarget} position={popupPosition} onWasted={handleWasted} onFreebie={handleFreebie} onClose={() => setLongPressTarget(null)} />
+        <LongPressPopup product={longPressTarget} position={popupPosition} onWasted={handleWasted} onFreebie={handleFreebie} onRestock={handleRestock} onClose={() => setLongPressTarget(null)} />
       )}
 
       {hasPin && !pinExists && <PinSetup />}

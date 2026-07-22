@@ -69,6 +69,23 @@ export async function logWasteOrFreebie(
   }
 }
 
+export async function restockProduct(
+  productId: string,
+  quantity: number,
+): Promise<boolean> {
+  try {
+    const { error: stockError } = await supabase.rpc('add_stock', { p_product_id: productId, p_quantity: quantity })
+    if (stockError) throw stockError
+    await supabase.from('inventory_logs').insert({
+      store_id: STORE_ID, product_id: productId, change_amount: quantity, reason: 'restock', sale_id: null,
+    })
+    return true
+  } catch (err: any) {
+    console.error('restockProduct failed:', err?.message || err)
+    return false
+  }
+}
+
 export async function fetchStats(period: Period): Promise<EnhancedStats> {
   const { start, end } = getPeriodRange(period)
   const empty: EnhancedStats = {
