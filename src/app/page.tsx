@@ -243,7 +243,7 @@ function POSApp() {
       <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto md:pr-80">
         {activeTab === 'checkout' && (
           loading ? (
             <div className="grid grid-cols-3 gap-3 p-4">

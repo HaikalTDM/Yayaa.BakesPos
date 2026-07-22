@@ -27,7 +27,7 @@ export default function ProductGrid({ products, onAddToCart, onLongPress }: Prop
   }, [products])
 
   return (
-    <div className="p-4 pb-24 space-y-5">
+    <div className="p-4 pb-24 md:pb-8 space-y-5">
       {sections.map(([category, items]) => (
         <div key={category}>
           <div className="mb-3">
@@ -40,7 +40,7 @@ export default function ProductGrid({ products, onAddToCart, onLongPress }: Prop
               </p>
             )}
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
             {items.map((product) => (
               <ProductCard
                 key={product.id}
