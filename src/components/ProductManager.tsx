@@ -250,7 +250,6 @@ export default function ProductManager({ products, onRefresh }: Props) {
             ref={newFileRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={(e) => handleImagePick(e, true)}
             className="hidden"
           />
@@ -321,7 +320,6 @@ export default function ProductManager({ products, onRefresh }: Props) {
                       ref={editFileRef}
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       onChange={(e) => handleImagePick(e, false)}
                       className="hidden"
                     />
