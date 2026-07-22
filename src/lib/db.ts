@@ -162,7 +162,10 @@ export async function addProduct(name: string, price: number, stock: number, cat
     .select()
     .single()
 
-  if (error) { console.error('Failed to add product:', error); return null }
+  if (error) {
+    console.error('Failed to add product:', error.message, error.details, error.hint)
+    return null
+  }
   return data as Product
 }
 
@@ -172,7 +175,7 @@ export async function updateProduct(id: string, updates: { name?: string; price?
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
 
-  if (error) { console.error('Failed to update product:', error); return false }
+  if (error) { console.error('Failed to update product:', error.message, error.details, error.hint); return false }
   return true
 }
 
@@ -182,7 +185,7 @@ export async function deleteProduct(id: string): Promise<boolean> {
     .delete()
     .eq('id', id)
 
-  if (error) { console.error('Failed to delete product:', error); return false }
+  if (error) { console.error('Failed to delete product:', error.message, error.details, error.hint); return false }
   return true
 }
 

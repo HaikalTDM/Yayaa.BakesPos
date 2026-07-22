@@ -5,7 +5,6 @@ import { X, Check, Loader2 } from 'lucide-react'
 import { CartProvider, useCart } from '@/hooks/useCart'
 import { PinProvider, usePinLock } from '@/hooks/usePinLock'
 import { fetchProducts, createSale, logWasteOrFreebie } from '@/lib/db'
-import { initStoreContext } from '@/lib/supabase'
 import type { Product, PaymentMethod, Tab } from '@/lib/types'
 import TabBar from '@/components/TabBar'
 import ProductGrid from '@/components/ProductGrid'
@@ -70,7 +69,6 @@ function POSApp() {
   }, [])
 
   useEffect(() => {
-    initStoreContext()
     loadProducts()
   }, [loadProducts])
 

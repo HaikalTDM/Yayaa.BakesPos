@@ -11,10 +11,3 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 })
 
 export const STORE_ID = process.env.NEXT_PUBLIC_STORE_ID ?? '00000000-0000-0000-0000-000000000001'
-
-export async function initStoreContext(): Promise<void> {
-  const { error } = await supabase.rpc('set_store_id', { p_store_id: STORE_ID })
-  if (error) {
-    console.error('Failed to set store context for RLS:', error.message)
-  }
-}

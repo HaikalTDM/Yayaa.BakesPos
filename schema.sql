@@ -134,27 +134,19 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ==========================================
--- 8. RLS POLICIES
+-- 8. RLS — DISABLED (app filters by store_id in every query)
 -- ==========================================
-ALTER TABLE products        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sales           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sale_items      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE inventory_logs  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE session_modals  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products        DISABLE ROW LEVEL SECURITY;
+ALTER TABLE sales           DISABLE ROW LEVEL SECURITY;
+ALTER TABLE sale_items      DISABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_logs  DISABLE ROW LEVEL SECURITY;
+ALTER TABLE session_modals  DISABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "store_products"       ON products;
 DROP POLICY IF EXISTS "store_sales"          ON sales;
 DROP POLICY IF EXISTS "store_sale_items"     ON sale_items;
 DROP POLICY IF EXISTS "store_inventory_logs" ON inventory_logs;
 DROP POLICY IF EXISTS "store_session_modals" ON session_modals;
-
-CREATE POLICY "store_products"       ON products       FOR ALL USING (store_id = current_setting('app.current_store_id')::uuid);
-CREATE POLICY "store_sales"          ON sales          FOR ALL USING (store_id = current_setting('app.current_store_id')::uuid);
-CREATE POLICY "store_inventory_logs" ON inventory_logs FOR ALL USING (store_id = current_setting('app.current_store_id')::uuid);
-CREATE POLICY "store_session_modals" ON session_modals FOR ALL USING (store_id = current_setting('app.current_store_id')::uuid);
-
-CREATE POLICY "store_sale_items" ON sale_items FOR ALL
-  USING (sale_id IN (SELECT id FROM sales WHERE store_id = current_setting('app.current_store_id')::uuid));
 
 -- ==========================================
 -- 9. RPC: Safe stock deduction
