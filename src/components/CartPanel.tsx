@@ -8,9 +8,10 @@ type Props = {
   onProceed: () => void
   onBack: () => void
   variant?: 'sidebar' | 'inline'
+  animateIn?: boolean
 }
 
-export default function CartPanel({ onProceed, onBack, variant = 'inline' }: Props) {
+export default function CartPanel({ onProceed, onBack, variant = 'inline', animateIn = false }: Props) {
   const { cart, dispatch } = useCart()
   const [expanded, setExpanded] = useState(false)
 
@@ -21,19 +22,13 @@ export default function CartPanel({ onProceed, onBack, variant = 'inline' }: Pro
     return <SidebarCart total={total} itemCount={itemCount} onProceed={onProceed} />
   }
 
+  // On mobile, hide entirely when cart is empty (no placeholder sheet)
   if (cart.length === 0) {
-    return (
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t-2 border-pink-100 rounded-t-3xl shadow-[0_-4px_20px_rgba(248,158,174,0.15)] px-5 pt-5 pb-8">
-        <div className="text-center py-4">
-          <ShoppingBasket className="w-8 h-8 text-pink-200 mx-auto mb-2" strokeWidth={1.5} />
-          <p className="text-sm text-[#333333]/60 font-medium">Tap desserts above to add them</p>
-        </div>
-      </div>
-    )
+    return null
   }
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t-2 border-pink-100 rounded-t-3xl shadow-[0_-4px_20px_rgba(248,158,174,0.15)] transition-all duration-200">
+    <div className={`md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t-2 border-pink-100 rounded-t-3xl shadow-[0_-4px_20px_rgba(248,158,174,0.15)] transition-all duration-200 ${animateIn ? 'animate-slide-up-cart' : ''}`}>
       {!expanded ? (
         <button
           onClick={() => setExpanded(true)}

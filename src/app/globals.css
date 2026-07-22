@@ -20,3 +20,39 @@ input[type='number']::-webkit-inner-spin-button {
 input[type='number'] {
   -moz-appearance: textfield;
 }
+
+/* Cart bar entrance — slides up from below the screen */
+@keyframes slideUpCart {
+  0% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up-cart {
+  animation: slideUpCart 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Fly-to-cart — product icon travels from tap position to the cart bar */
+@keyframes flyToCart {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  60% {
+    transform: translate(var(--fly-dx), var(--fly-dy)) scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--fly-dx), var(--fly-dy)) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.animate-fly-to-cart {
+  animation: flyToCart 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}

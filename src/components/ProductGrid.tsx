@@ -6,7 +6,7 @@ import type { Product } from '@/lib/types'
 
 type Props = {
   products: Product[]
-  onAddToCart: (product: Product) => void
+  onAddToCart: (product: Product, e: React.PointerEvent<HTMLButtonElement>) => void
   onLongPress: (product: Product) => void
 }
 

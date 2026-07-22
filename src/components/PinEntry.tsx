@@ -9,15 +9,68 @@ const PIN_LENGTH = 4
 type Props = {
   onClose: () => void
   onSuccess: () => void
+  isChangeMode?: boolean
+  onChangePin?: (newPin: string) => Promise<void>
 }
 
-export default function PinEntry({ onClose, onSuccess }: Props) {
-  const { unlock, resetPin } = usePinLock()
+export default function PinEntry({ onClose, onSuccess, isChangeMode, onChangePin }: Props) {
+  const { unlock } = usePinLock()
   const [digits, setDigits] = useState<string[]>([])
+  const [step, setStep] = useState<'current' | 'new' | 'confirm'>('current')
+  const [newPin, setNewPin] = useState<string[]>([])
+  const [confirmPin, setConfirmPin] = useState<string[]>([])
   const [error, setError] = useState(false)
-  const [showReset, setShowReset] = useState(false)
 
   const handleDigit = async (d: string) => {
+    if (isChangeMode) {
+      // Change PIN flow: current -> new -> confirm
+      if (step === 'current') {
+        if (digits.length >= PIN_LENGTH) return
+        const next = [...digits, d]
+        setDigits(next)
+        setError(false)
+        if (next.length === PIN_LENGTH) {
+          const entered = next.join('')
+          const ok = await unlock(entered)
+          if (!ok) {
+            setError(true)
+            setDigits([])
+          } else {
+            setTimeout(() => {
+              setStep('new')
+              setDigits([])
+              setError(false)
+            }, 300)
+          }
+        }
+      } else if (step === 'new') {
+        if (newPin.length >= PIN_LENGTH) return
+        const next = [...newPin, d]
+        setNewPin(next)
+        if (next.length === PIN_LENGTH) {
+          setTimeout(() => {
+            setStep('confirm')
+          }, 300)
+        }
+      } else if (step === 'confirm') {
+        if (confirmPin.length >= PIN_LENGTH) return
+        const next = [...confirmPin, d]
+        setConfirmPin(next)
+        if (next.length === PIN_LENGTH) {
+          const entered = next.join('')
+          if (entered === newPin.join('')) {
+            await onChangePin?.(entered)
+            onSuccess()
+          } else {
+            setError(true)
+            setConfirmPin([])
+          }
+        }
+      }
+      return
+    }
+
+    // Normal unlock flow
     if (digits.length >= PIN_LENGTH) return
     const next = [...digits, d]
     setDigits(next)
@@ -35,14 +88,35 @@ export default function PinEntry({ onClose, onSuccess }: Props) {
   }
 
   const handleDelete = () => {
-    setDigits((prev) => prev.slice(0, -1))
+    if (isChangeMode) {
+      if (step === 'current') {
+        setDigits((prev) => prev.slice(0, -1))
+      } else if (step === 'new') {
+        setNewPin((prev) => prev.slice(0, -1))
+      } else {
+        setConfirmPin((prev) => prev.slice(0, -1))
+      }
+    } else {
+      setDigits((prev) => prev.slice(0, -1))
+    }
     setError(false)
   }
 
-  const handleReset = async () => {
-    await resetPin()
-    setTimeout(() => onClose(), 100)
-  }
+  const currentDots = isChangeMode
+    ? step === 'current' ? digits : step === 'new' ? newPin : confirmPin
+    : digits
+
+  const title = isChangeMode
+    ? step === 'current'
+      ? 'Enter current PIN'
+      : step === 'new'
+        ? 'Create new PIN'
+        : 'Confirm new PIN'
+    : 'Enter PIN'
+
+  const subtitle = isChangeMode
+    ? 'Change your store PIN'
+    : 'Required for admin access'
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center animate-in fade-in">
@@ -54,97 +128,69 @@ export default function PinEntry({ onClose, onSuccess }: Props) {
           <X className="w-4 h-4" strokeWidth={2} />
         </button>
 
-        {showReset ? (
-          <div className="text-center">
-            <ShieldAlert className="w-10 h-10 text-amber-500 mx-auto mb-3" strokeWidth={1.5} />
-            <h3 className="text-base font-extrabold text-brand-text mb-1">Reset PIN?</h3>
-            <p className="text-xs text-brand-text/50 mb-5">
-              This clears your current PIN. You will create a new one.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowReset(false)}
-                className="flex-1 py-2.5 rounded-xl border-2 border-brand-pink/20 text-brand-text/60 font-semibold text-sm"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleReset}
-                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm"
-              >
-                Reset PIN
-              </button>
-            </div>
+        <div className="text-center mb-5">
+          <div className="w-12 h-12 rounded-xl bg-brand-pink/10 flex items-center justify-center mx-auto mb-3">
+            <ShieldAlert className="w-6 h-6 text-brand-pink" strokeWidth={1.5} />
           </div>
-        ) : (
-          <>
-            <div className="text-center mb-5">
-              <div className="w-12 h-12 rounded-xl bg-brand-pink/10 flex items-center justify-center mx-auto mb-3">
-                <ShieldAlert className="w-6 h-6 text-brand-pink" strokeWidth={1.5} />
-              </div>
-              <p className="text-sm font-bold text-brand-text">Enter PIN</p>
-              <p className="text-xs text-brand-text/50 mt-0.5">
-                Required for admin access
-              </p>
-            </div>
+          <p className="text-sm font-bold text-brand-text">{title}</p>
+          <p className="text-xs text-brand-text/50 mt-0.5">{subtitle}</p>
+          {isChangeMode && step !== 'current' && (
+            <p className="text-[10px] text-brand-pink font-medium mt-1">
+              Step {step === 'new' ? '2' : '3'} of 3
+            </p>
+          )}
+        </div>
 
-            {/* Dots */}
-            <div className="flex gap-4 justify-center mb-6">
-              {Array.from({ length: PIN_LENGTH }).map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${
-                    error
-                      ? 'border-red-400 bg-red-400'
-                      : i < digits.length
-                        ? 'bg-brand-pink border-brand-pink'
-                        : 'border-brand-text/15 bg-transparent'
-                  }`}
-                />
-              ))}
-            </div>
+        {/* Dots */}
+        <div className="flex gap-4 justify-center mb-6">
+          {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+            <div
+              key={i}
+              className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${
+                error
+                  ? 'border-red-400 bg-red-400'
+                  : i < currentDots.length
+                    ? 'bg-brand-pink border-brand-pink'
+                    : 'border-brand-text/15 bg-transparent'
+              }`}
+            />
+          ))}
+        </div>
 
-            {error && (
-              <p className="text-xs text-red-500 font-medium text-center mb-3 -mt-3">
-                Incorrect PIN
-              </p>
-            )}
-
-            {/* Keypad */}
-            <div className="grid grid-cols-3 gap-2.5 max-w-[220px] mx-auto mb-4">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                <button
-                  key={n}
-                  onClick={() => handleDigit(n.toString())}
-                  className="w-full aspect-square rounded-xl bg-brand-bg border border-brand-pink/10 text-brand-text text-lg font-bold active:bg-brand-pink/10 transition-colors"
-                >
-                  {n}
-                </button>
-              ))}
-              <div />
-              <button
-                onClick={() => handleDigit('0')}
-                className="w-full aspect-square rounded-xl bg-brand-bg border border-brand-pink/10 text-brand-text text-lg font-bold active:bg-brand-pink/10 transition-colors"
-              >
-                0
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={digits.length === 0}
-                className="w-full aspect-square rounded-xl bg-transparent text-brand-text/25 text-xs font-bold active:text-brand-text/50 transition-colors disabled:opacity-20"
-              >
-                DEL
-              </button>
-            </div>
-
-            <button
-              onClick={() => setShowReset(true)}
-              className="text-[10px] text-brand-text/25 font-medium mx-auto block active:text-brand-text/50"
-            >
-              Forgot PIN?
-            </button>
-          </>
+        {error && (
+          <p className="text-xs text-red-500 font-medium text-center mb-3 -mt-3">
+            {isChangeMode && step === 'confirm' ? 'PINs do not match' : 'Incorrect PIN'}
+          </p>
         )}
+
+        {/* Keypad */}
+        <div className="grid grid-cols-3 gap-2.5 max-w-[220px] mx-auto mb-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+            <button
+              key={n}
+              onClick={() => handleDigit(n.toString())}
+              disabled={currentDots.length >= PIN_LENGTH}
+              className="w-full aspect-square rounded-xl bg-brand-bg border border-brand-pink/10 text-brand-text text-lg font-bold active:bg-brand-pink/10 transition-colors disabled:opacity-30"
+            >
+              {n}
+            </button>
+          ))}
+          <div />
+          <button
+            onClick={() => handleDigit('0')}
+            disabled={currentDots.length >= PIN_LENGTH}
+            className="w-full aspect-square rounded-xl bg-brand-bg border border-brand-pink/10 text-brand-text text-lg font-bold active:bg-brand-pink/10 transition-colors disabled:opacity-30"
+          >
+            0
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={currentDots.length === 0}
+            className="w-full aspect-square rounded-xl bg-transparent text-brand-text/25 text-xs font-bold active:text-brand-text/50 transition-colors disabled:opacity-20"
+          >
+            DEL
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { X, Check, Loader2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { X, Check, Loader2, CakeSlice } from 'lucide-react'
+import confetti from 'canvas-confetti'
 import { CartProvider, useCart } from '@/hooks/useCart'
 import { PinProvider, usePinLock } from '@/hooks/usePinLock'
 import { fetchProducts, createSale, logWasteOrFreebie } from '@/lib/db'
@@ -21,6 +22,30 @@ import { ToastContainer } from '@/components/Toast'
 
 const ADMIN_TABS: Tab[] = ['reconciliation', 'products']
 
+// Minimalist chime using Web Audio API — two soft ascending notes
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const notes = [523.25, 659.25] // C5, E5 — clean ascending interval
+    const duration = 0.15
+    const gain = ctx.createGain()
+    gain.connect(ctx.destination)
+    gain.gain.setValueAtTime(0.3, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12)
+      osc.connect(gain)
+      osc.start(ctx.currentTime + i * 0.12)
+      osc.stop(ctx.currentTime + i * 0.12 + duration)
+    })
+  } catch {
+    // Silently fail if AudioContext is unavailable
+  }
+}
+
 export default function HomePage() {
   return (
     <PinProvider>
@@ -33,12 +58,13 @@ export default function HomePage() {
 
 function POSApp() {
   const { cart, dispatch } = useCart()
-  const { hasPin, isUnlocked, pinExists } = usePinLock()
+  const { hasPin, isUnlocked, pinExists, changePin } = usePinLock()
   const [products, setProducts] = useState<Product[]>([])
   const [activeTab, setActiveTab] = useState<Tab>('checkout')
   const [loading, setLoading] = useState(true)
   const [pendingTab, setPendingTab] = useState<Tab | null>(null)
   const [showPinEntry, setShowPinEntry] = useState(false)
+  const [showChangePin, setShowChangePin] = useState(false)
 
   // Checkout flow state
   const [flowStep, setFlowStep] = useState<'cart' | 'payment' | 'qr' | 'confirm'>('cart')
@@ -48,6 +74,24 @@ function POSApp() {
   // Long press state
   const [longPressTarget, setLongPressTarget] = useState<Product | null>(null)
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 })
+
+  // Fly-to-cart animation state
+  const [flyingProduct, setFlyingProduct] = useState<{
+    product: Product
+    startX: number
+    startY: number
+    endX: number
+    endY: number
+    key: number
+  } | null>(null)
+  const [cartAnimateIn, setCartAnimateIn] = useState(false)
+  const flyKeyRef = useRef(0)
+  const cartWasEmpty = useRef(true)
+
+  // Track if cart was empty before the last add (for entrance animation)
+  useEffect(() => {
+    cartWasEmpty.current = cart.length === 0
+  }, [cart.length])
 
   const loadProducts = useCallback(async () => {
     setLoading(true)
@@ -82,6 +126,12 @@ function POSApp() {
     setPendingTab(null)
   }, [])
 
+  const handleChangePin = useCallback(async (newPin: string) => {
+    await changePin(newPin)
+    setShowChangePin(false)
+    showToast('PIN changed successfully')
+  }, [changePin])
+
   // Update product stock locally after DB mutations
   const updateLocalStock = useCallback(
     (productId: string, delta: number) => {
@@ -94,13 +144,53 @@ function POSApp() {
     [],
   )
 
-  // Cart handlers
+  // Cart handlers — with fly animation logic
   const handleAddToCart = useCallback(
-    (product: Product) => {
+    (product: Product, e: React.PointerEvent<HTMLButtonElement>) => {
+      const wasEmpty = cart.length === 0
+
+      // Add to cart
       dispatch({ type: 'ADD_ITEM', product })
+
+      // Calculate animation coordinates
+      const startX = e.clientX
+      const startY = e.clientY
+      // Target: center of the bottom of the screen (where the cart bar will appear)
+      const endX = typeof window !== 'undefined' ? window.innerWidth / 2 : startX
+      const endY = typeof window !== 'undefined' ? window.innerHeight - 50 : startY + 200
+
+      // Trigger fly animation
+      flyKeyRef.current += 1
+      setFlyingProduct({
+        product,
+        startX,
+        startY,
+        endX,
+        endY,
+        key: flyKeyRef.current,
+      })
+
+      // If cart was empty, show the cart bar with entrance animation after fly completes
+      if (wasEmpty) {
+        setTimeout(() => {
+          setCartAnimateIn(true)
+        }, 450) // slightly after fly animation ends
+      }
+
+      // Clean up flying element after animation
+      setTimeout(() => {
+        setFlyingProduct(null)
+      }, 500)
     },
-    [dispatch],
+    [dispatch, cart.length],
   )
+
+  // Clear cartAnimateIn when cart becomes empty (user cleared all items)
+  useEffect(() => {
+    if (cart.length === 0) {
+      setCartAnimateIn(false)
+    }
+  }, [cart.length])
 
   const handleLongPress = useCallback(
     (product: Product) => {
@@ -176,6 +266,15 @@ function POSApp() {
       setFlowStep('cart')
       setSelectedPayment(null)
       showToast('Sale completed')
+
+      // 🎉 Confetti + chime on successful payment
+      playChime()
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#F89EAE', '#FFD700', '#FF6B8A', '#A78BFA', '#60A5FA'],
+      })
     } else {
       showToast('Checkout failed. Try again.')
     }
@@ -210,11 +309,21 @@ function POSApp() {
               <img src="/logo-workmark.png" alt="yayaa.bakes" className="h-14 object-contain" />
             </div>
           </div>
-          {activeTab === 'checkout' && cart.length > 0 && (
-            <div className="bg-[#F89EAE] text-white text-xs font-bold px-3 py-1.5 rounded-full">
-              {cart.reduce((s, i) => s + i.quantity, 0)} items
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {isUnlocked && ADMIN_TABS.includes(activeTab) && (
+              <button
+                onClick={() => setShowChangePin(true)}
+                className="text-[10px] text-[#333333]/40 font-medium px-2 py-1 rounded-lg border border-pink-100 active:bg-pink-50 transition-colors"
+              >
+                Change PIN
+              </button>
+            )}
+            {activeTab === 'checkout' && cart.length > 0 && (
+              <div className="bg-[#F89EAE] text-white text-xs font-bold px-3 py-1.5 rounded-full">
+                {cart.reduce((s, i) => s + i.quantity, 0)} items
+              </div>
+            )}
+          </div>
         </header>
 
         <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
@@ -241,7 +350,7 @@ function POSApp() {
       {/* MOBILE CART — fixed bottom sheet */}
       {activeTab === 'checkout' && flowStep === 'cart' && (
         <div className="md:hidden">
-          <CartPanel onProceed={handleProceedToPayment} onBack={resetCheckout} variant="inline" />
+          <CartPanel onProceed={handleProceedToPayment} onBack={resetCheckout} variant="inline" animateIn={cartAnimateIn} />
         </div>
       )}
 
@@ -249,6 +358,24 @@ function POSApp() {
       {activeTab === 'checkout' && (
         <div className="hidden md:flex w-[32%] border-l border-pink-100 bg-white flex-col h-full shrink-0">
           <CartPanel onProceed={handleProceedToPayment} onBack={resetCheckout} variant="sidebar" />
+        </div>
+      )}
+
+      {/* Fly-to-cart animation element */}
+      {flyingProduct && (
+        <div
+          key={flyingProduct.key}
+          className="fixed z-50 pointer-events-none animate-fly-to-cart"
+          style={{
+            left: flyingProduct.startX - 20,
+            top: flyingProduct.startY - 20,
+            '--fly-dx': `${flyingProduct.endX - flyingProduct.startX}px`,
+            '--fly-dy': `${flyingProduct.endY - flyingProduct.startY}px`,
+          } as React.CSSProperties}
+        >
+          <div className="w-10 h-10 rounded-full bg-[#F89EAE] shadow-lg flex items-center justify-center">
+            <CakeSlice className="w-5 h-5 text-white" strokeWidth={2} />
+          </div>
         </div>
       )}
 
@@ -299,6 +426,14 @@ function POSApp() {
 
       {hasPin && !pinExists && <PinSetup />}
       {showPinEntry && <PinEntry onClose={handleClosePinEntry} onSuccess={onPinSuccess} />}
+      {showChangePin && (
+        <PinEntry
+          onClose={() => setShowChangePin(false)}
+          onSuccess={() => setShowChangePin(false)}
+          isChangeMode
+          onChangePin={handleChangePin}
+        />
+      )}
       <ToastContainer />
     </div>
   )

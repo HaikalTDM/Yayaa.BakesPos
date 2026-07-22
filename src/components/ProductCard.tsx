@@ -7,7 +7,7 @@ import type { Product } from '@/lib/types'
 
 type Props = {
   product: Product
-  onAdd: (product: Product) => void
+  onAdd: (product: Product, e: React.PointerEvent<HTMLButtonElement>) => void
   onLongPress: (product: Product) => void
 }
 
@@ -19,7 +19,7 @@ export default function ProductCard({ product, onAdd, onLongPress }: Props) {
 
   const longPress = useLongPress(
     () => onLongPress(product),
-    () => { if (!isOutOfStock) onAdd(product) },
+    (e) => { if (!isOutOfStock) onAdd(product, e) },
     800,
   )
 

@@ -11,6 +11,7 @@ type PinContextType = {
   isUnlocked: boolean
   pinExists: boolean
   setPin: (pin: string) => Promise<void>
+  changePin: (newPin: string) => Promise<void>
   unlock: (pin: string) => Promise<boolean>
   lock: () => void
   resetPin: () => Promise<void>
@@ -61,6 +62,14 @@ export function PinProvider({ children }: { children: ReactNode }) {
     setIsUnlocked(false)
   }, [])
 
+  const changePin = useCallback(async (newPin: string) => {
+    if (newPin.length !== PIN_LENGTH) return
+    const hash = await hashPin(newPin)
+    localStorage.setItem(STORAGE_KEY, hash)
+    setStoredHash(hash)
+    await savePinHash(hash)
+  }, [])
+
   const resetPin = useCallback(async () => {
     localStorage.removeItem(STORAGE_KEY)
     setStoredHash(null)
@@ -69,7 +78,7 @@ export function PinProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <PinContext.Provider value={{ hasPin: hydrated, isUnlocked, pinExists, setPin, unlock, lock, resetPin }}>
+    <PinContext.Provider value={{ hasPin: hydrated, isUnlocked, pinExists, setPin, changePin, unlock, lock, resetPin }}>
       {children}
     </PinContext.Provider>
   )

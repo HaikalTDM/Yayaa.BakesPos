@@ -4,7 +4,7 @@ import { useState, useCallback, useRef } from 'react'
 
 export function useLongPress(
   onLongPress: () => void,
-  onClick: () => void,
+  onClick: (e: React.PointerEvent<HTMLButtonElement>) => void,
   delay = 1000,
 ) {
   const [isPressing, setIsPressing] = useState(false)
@@ -12,10 +12,12 @@ export function useLongPress(
   const isLongPress = useRef(false)
   const onLongPressRef = useRef(onLongPress)
   const onClickRef = useRef(onClick)
+  const lastEventRef = useRef<React.PointerEvent<HTMLButtonElement> | null>(null)
   onLongPressRef.current = onLongPress
   onClickRef.current = onClick
 
-  const start = useCallback(() => {
+  const start = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    lastEventRef.current = e
     isLongPress.current = false
     setIsPressing(true)
     timerRef.current = setTimeout(() => {
@@ -25,14 +27,15 @@ export function useLongPress(
     }, delay)
   }, [delay])
 
-  const end = useCallback(() => {
+  const end = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    lastEventRef.current = e
     if (timerRef.current) {
       clearTimeout(timerRef.current)
       timerRef.current = null
     }
     setIsPressing(false)
     if (!isLongPress.current) {
-      onClickRef.current()
+      onClickRef.current(e)
     }
   }, [])
 
