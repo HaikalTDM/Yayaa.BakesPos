@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { Pencil, Trash2, Plus, Check, X, Package, Camera } from 'lucide-react'
+import { useState, useRef, useMemo } from 'react'
+import { Pencil, Trash2, Plus, Check, X, Package, Camera, ChevronDown } from 'lucide-react'
 import { addProduct, updateProduct, deleteProduct } from '@/lib/db'
 import { compressImage } from '@/lib/image'
 import { showToast } from '@/components/Toast'
@@ -23,12 +23,22 @@ export default function ProductManager({ products, onRefresh }: Props) {
   const [newPrice, setNewPrice] = useState('')
   const [newStock, setNewStock] = useState('')
   const [newCategory, setNewCategory] = useState('')
+  const [newCategoryCustom, setNewCategoryCustom] = useState('')
+  const [isAddingNewCategory, setIsAddingNewCategory] = useState(false)
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
   const [newImage, setNewImage] = useState<string | null>(null)
   const [editImage, setEditImage] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const newFileRef = useRef<HTMLInputElement>(null)
   const editFileRef = useRef<HTMLInputElement>(null)
+
+  const existingCategories = useMemo(() => {
+    const cats = new Set(products.map((p) => p.category))
+    return Array.from(cats).sort()
+  }, [products])
+
+  const effectiveCategory = isAddingNewCategory ? newCategoryCustom : newCategory
 
   const startEdit = (p: Product) => {
     setEditingId(p.id)
@@ -73,8 +83,9 @@ export default function ProductManager({ products, onRefresh }: Props) {
   const handleAdd = async () => {
     const price = parseFloat(newPrice)
     const stock = parseInt(newStock) || 0
+    const cat = effectiveCategory.trim() || (existingCategories[0] ?? 'Dessert')
     if (!newName.trim() || isNaN(price) || price < 0) return
-    const product = await addProduct(newName.trim(), price, stock, newCategory.trim() || 'Dessert', newImage ?? undefined)
+    const product = await addProduct(newName.trim(), price, stock, cat, newImage ?? undefined)
     if (product) {
       showToast('Product added')
       onRefresh()
@@ -83,10 +94,23 @@ export default function ProductManager({ products, onRefresh }: Props) {
       setNewPrice('')
       setNewStock('')
       setNewCategory('')
+      setNewCategoryCustom('')
+      setIsAddingNewCategory(false)
       setNewImage(null)
     } else {
       showToast('Add failed')
     }
+  }
+
+  const resetAddForm = () => {
+    setShowAdd(false)
+    setNewName('')
+    setNewPrice('')
+    setNewStock('')
+    setNewCategory('')
+    setNewCategoryCustom('')
+    setIsAddingNewCategory(false)
+    setNewImage(null)
   }
 
   const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>, isNew: boolean) => {
@@ -157,13 +181,70 @@ export default function ProductManager({ products, onRefresh }: Props) {
               </div>
             </div>
           </div>
-          <input
-            type="text"
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value)}
-            placeholder="Category (e.g. Tarts)"
-            className="w-full px-3 py-2.5 rounded-xl border-2 border-brand-pink/20 bg-brand-bg text-sm font-medium text-brand-text placeholder:text-brand-text/30 focus:outline-none focus:border-brand-pink"
-          />
+          {/* Custom category dropdown */}
+          <div className="relative">
+            <label className="text-[10px] font-semibold text-brand-text/50 block mb-1">Category</label>
+            <button
+              type="button"
+              onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
+              className="w-full px-3 py-2.5 rounded-xl border-2 border-brand-pink/20 bg-brand-bg text-sm font-medium text-brand-text text-left flex items-center justify-between focus:outline-none focus:border-brand-pink active:bg-white transition-colors"
+            >
+              <span className={effectiveCategory ? 'text-brand-text' : 'text-brand-text/30'}>
+                {effectiveCategory || 'Select category'}
+              </span>
+              <ChevronDown className={`w-4 h-4 text-brand-text/30 transition-transform ${categoryDropdownOpen ? 'rotate-180' : ''}`} strokeWidth={2} />
+            </button>
+
+            {categoryDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setCategoryDropdownOpen(false)} />
+                <div className="absolute z-50 left-0 right-0 mt-1 bg-white rounded-xl border-2 border-brand-pink/20 shadow-lg overflow-hidden animate-in zoom-in-95 fade-in origin-top">
+                  {existingCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => {
+                        setIsAddingNewCategory(false)
+                        setNewCategory(cat)
+                        setCategoryDropdownOpen(false)
+                      }}
+                      className={`w-full px-3 py-2.5 text-left text-sm font-medium transition-colors active:bg-brand-pink/10 ${
+                        newCategory === cat && !isAddingNewCategory
+                          ? 'text-brand-pink bg-brand-pink/5'
+                          : 'text-brand-text hover:bg-brand-bg'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                  <div className="border-t border-brand-pink/10" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingNewCategory(true)
+                      setNewCategoryCustom('')
+                      setCategoryDropdownOpen(false)
+                    }}
+                    className="w-full px-3 py-2.5 text-left text-sm font-semibold text-brand-pink active:bg-brand-pink/10 transition-colors flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+                    Add new category
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {isAddingNewCategory && (
+            <input
+              type="text"
+              value={newCategoryCustom}
+              onChange={(e) => setNewCategoryCustom(e.target.value)}
+              placeholder="Type new category name..."
+              className="w-full px-3 py-2.5 rounded-xl border-2 border-brand-pink/30 bg-brand-bg text-sm font-medium text-brand-text placeholder:text-brand-text/30 focus:outline-none focus:border-brand-pink"
+              autoFocus
+            />
+          )}
 
           <input
             ref={newFileRef}
