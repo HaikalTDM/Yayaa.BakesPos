@@ -109,74 +109,63 @@ export async function logWasteOrFreebie(
 export async function fetchStats(period: Period): Promise<EnhancedStats> {
   const { start, end } = getPeriodRange(period)
 
-  if (IS_MOCK) {
-    let cashTotal = 0
-    let duitnowTotal = 0
-    let count = 0
-    const periodSales: number[] = []
-    for (const s of mockSales) {
-      if (s.created_at < start || s.created_at >= end) continue
-      if (s.total === 0) continue
-      if (s.payment_method === 'cash') cashTotal += s.total
-      else duitnowTotal += s.total
-      periodSales.push(s.total)
-      count++
-    }
-    const grossSales = round(cashTotal + duitnowTotal)
-    const modalTotal = sumModalsForRange(start, end)
-    return buildMockEnhanced(grossSales, cashTotal, duitnowTotal, modalTotal, count, periodSales)
-  }
-
-  const { data: sales, error } = await supabase
-    .from('sales')
-    .select('total, payment_method')
-    .eq('store_id', STORE_ID)
-    .eq('status', 'received')
-    .gte('created_at', start)
-    .lt('created_at', end)
-
-  if (error) {
-    console.error('Failed to fetch stats:', error)
-    const empty = { grossSales: 0, cashTotal: 0, duitnowTotal: 0, totalModal: 0, netProfit: 0, saleCount: 0 }
-    return { ...empty, avgOrderValue: 0, topProduct: '—', cashPct: 0, duitnowPct: 0, categoryBreakdown: [], lowStockProducts: [] }
-  }
-
   let cashTotal = 0
   let duitnowTotal = 0
+  let count = 0
   const periodSales: number[] = []
 
-  for (const sale of sales ?? []) {
-    if (sale.payment_method === 'cash') cashTotal += sale.total
-    else duitnowTotal += sale.total
-    periodSales.push(sale.total)
+  for (const s of mockSales) {
+    if (s.created_at < start || s.created_at >= end) continue
+    if (s.total === 0) continue
+    if (s.payment_method === 'cash') cashTotal += s.total
+    else duitnowTotal += s.total
+    periodSales.push(s.total)
+    count++
   }
 
-  const grossSales = cashTotal + duitnowTotal
-  const { data: periodModals } = await supabase
-    .from('session_modals')
-    .select('amount')
-    .eq('store_id', STORE_ID)
-    .gte('created_at', start)
-    .lt('created_at', end)
-  const modalTotal = (periodModals ?? []).reduce((sum, m: { amount: number }) => sum + m.amount, 0)
-  const saleCount = (sales ?? []).length
-  const cashPct = grossSales > 0 ? round((cashTotal / grossSales) * 100) : 0
-  const duitnowPct = grossSales > 0 ? round((duitnowTotal / grossSales) * 100) : 0
-
-  return {
-    grossSales: round(grossSales),
-    cashTotal: round(cashTotal),
-    duitnowTotal: round(duitnowTotal),
-    totalModal: modalTotal,
-    netProfit: round(grossSales - modalTotal),
-    saleCount,
-    avgOrderValue: saleCount > 0 ? round(grossSales / saleCount) : 0,
-    topProduct: '—',
-    cashPct,
-    duitnowPct,
-    categoryBreakdown: [],
-    lowStockProducts: [],
+  let modalTotal = 0
+  for (const m of mockModals) {
+    if (m.created_at >= start && m.created_at < end) modalTotal += m.amount
   }
+  modalTotal = round(modalTotal)
+
+  if (!IS_MOCK) {
+    try {
+      const { data: sales, error } = await supabase
+        .from('sales')
+        .select('total, payment_method')
+        .eq('store_id', STORE_ID)
+        .eq('status', 'received')
+        .gte('created_at', start)
+        .lt('created_at', end)
+
+      if (!error && sales) {
+        cashTotal = 0; duitnowTotal = 0; count = 0; periodSales.length = 0
+        for (const sale of sales) {
+          if (sale.payment_method === 'cash') cashTotal += sale.total
+          else duitnowTotal += sale.total
+          periodSales.push(sale.total)
+          count++
+        }
+      }
+
+      const { data: modals } = await supabase
+        .from('session_modals')
+        .select('amount')
+        .eq('store_id', STORE_ID)
+        .gte('created_at', start)
+        .lt('created_at', end)
+
+      if (modals) {
+        modalTotal = round(modals.reduce((sum: number, m: { amount: number }) => sum + m.amount, 0))
+      }
+    } catch (err: any) {
+      console.error('fetchStats Supabase failed, using local data:', err?.message || err)
+    }
+  }
+
+  const grossSales = round(cashTotal + duitnowTotal)
+  return buildMockEnhanced(grossSales, cashTotal, duitnowTotal, modalTotal, count, periodSales)
 }
 
 function buildMockEnhanced(
@@ -293,39 +282,42 @@ export async function deleteProduct(id: string): Promise<boolean> {
 }
 
 export async function addModalEntry(amount: number, note: string): Promise<ModalEntry | null> {
-  if (IS_MOCK) {
-    const entry: ModalEntry = {
-      id: `m${++mockModalIdCounter}`,
-      amount,
-      note,
-      created_at: new Date().toISOString(),
+  const entry: ModalEntry = {
+    id: `m${++mockModalIdCounter}`,
+    amount,
+    note,
+    created_at: new Date().toISOString(),
+  }
+  mockModals.unshift(entry)
+
+  if (!IS_MOCK) {
+    try {
+      await supabase.from('session_modals').insert({ store_id: STORE_ID, amount, note })
+    } catch (err: any) {
+      console.error('addModalEntry Supabase failed, saved locally:', err?.message || err)
     }
-    mockModals.unshift(entry)
-    return entry
   }
 
-  const { data, error } = await supabase
-    .from('session_modals')
-    .insert({ store_id: STORE_ID, amount, note })
-    .select()
-    .single()
-
-  if (error) { console.error('Failed to add modal entry:', error); return null }
-  return data as ModalEntry
+  return entry
 }
 
 export async function fetchModalEntries(): Promise<ModalEntry[]> {
-  if (IS_MOCK) return [...mockModals]
+  if (!IS_MOCK) {
+    try {
+      const { data, error } = await supabase
+        .from('session_modals')
+        .select('*')
+        .eq('store_id', STORE_ID)
+        .order('created_at', { ascending: false })
+        .limit(20)
 
-  const { data, error } = await supabase
-    .from('session_modals')
-    .select('*')
-    .eq('store_id', STORE_ID)
-    .order('created_at', { ascending: false })
-    .limit(20)
+      if (!error && data) return data as ModalEntry[]
+    } catch (err: any) {
+      console.error('fetchModalEntries Supabase failed, using local:', err?.message || err)
+    }
+  }
 
-  if (error) { console.error('Failed to fetch modal entries:', error); return [] }
-  return data as ModalEntry[]
+  return [...mockModals]
 }
 
 function sumModalsForRange(start: string, end: string): number {
