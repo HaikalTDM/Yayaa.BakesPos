@@ -8,6 +8,8 @@ import {
 import { fetchStats, addModalEntry, fetchModalEntries, clearAllStoreData } from '@/lib/db'
 import type { EnhancedStats, Period, ModalEntry } from '@/lib/types'
 
+import ConfirmDialog from '@/components/ConfirmDialog'
+
 const PERIODS: { key: Period; label: string }[] = [
   { key: 'daily', label: 'Today' },
   { key: 'weekly', label: 'This Week' },
@@ -23,6 +25,7 @@ export default function ReconciliationDashboard() {
   const [showModalForm, setShowModalForm] = useState(false)
   const [modalEntries, setModalEntries] = useState<ModalEntry[]>([])
   const [saving, setSaving] = useState(false)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -54,9 +57,9 @@ export default function ReconciliationDashboard() {
   }
 
   const handleClearData = async () => {
-    if (!confirm('Clear all sales and modal data? This cannot be undone.')) return
     await clearAllStoreData()
     loadAll()
+    setShowClearConfirm(false)
   }
 
   const periodLabel =
@@ -318,12 +321,22 @@ export default function ReconciliationDashboard() {
       </button>
 
       <button
-        onClick={handleClearData}
+        onClick={() => setShowClearConfirm(true)}
         className="w-full mt-2 py-3 rounded-2xl border-2 border-red-200 text-red-400 font-semibold text-sm active:bg-red-50 transition-colors flex items-center justify-center gap-2"
       >
         <Trash2 className="w-4 h-4" strokeWidth={2} />
         Start Fresh
       </button>
+
+      <ConfirmDialog
+        open={showClearConfirm}
+        title="Clear All Data"
+        message="This permanently deletes all sales, inventory logs, and session modals. This cannot be undone."
+        confirmLabel="Delete All"
+        variant="danger"
+        onConfirm={handleClearData}
+        onCancel={() => setShowClearConfirm(false)}
+      />
     </div>
   )
 }

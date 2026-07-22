@@ -83,7 +83,7 @@ CREATE INDEX IF NOT EXISTS idx_sales_status   ON sales (store_id, status);
 CREATE TABLE IF NOT EXISTS sale_items (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   sale_id       UUID           NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
-  product_id    UUID           NOT NULL REFERENCES products(id),
+  product_id    UUID           REFERENCES products(id) ON DELETE SET NULL,
   quantity      INTEGER        NOT NULL CHECK (quantity > 0),
   price_at_sale DECIMAL(10,2)  NOT NULL
 );
@@ -97,7 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items (product_id);
 CREATE TABLE IF NOT EXISTS inventory_logs (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   store_id      UUID        NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  product_id    UUID        NOT NULL REFERENCES products(id),
+  product_id    UUID        REFERENCES products(id) ON DELETE SET NULL,
   change_amount INTEGER     NOT NULL,
   reason        TEXT        NOT NULL CHECK (reason IN ('sale', 'wasted', 'freebie', 'restock')),
   sale_id       UUID        REFERENCES sales(id) ON DELETE SET NULL,

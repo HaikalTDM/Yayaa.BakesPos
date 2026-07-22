@@ -179,14 +179,17 @@ export async function updateProduct(id: string, updates: { name?: string; price?
   return true
 }
 
-export async function deleteProduct(id: string): Promise<boolean> {
+export async function deleteProduct(id: string): Promise<{ ok: boolean; error?: string }> {
   const { error } = await supabase
     .from('products')
     .delete()
     .eq('id', id)
 
-  if (error) { console.error('Failed to delete product:', error.message, error.details, error.hint); return false }
-  return true
+  if (error) {
+    console.error('Failed to delete product:', error.message, error.details, error.hint)
+    return { ok: false, error: error.message }
+  }
+  return { ok: true }
 }
 
 export async function addModalEntry(amount: number, note: string): Promise<ModalEntry | null> {

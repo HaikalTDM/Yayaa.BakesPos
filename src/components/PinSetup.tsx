@@ -62,7 +62,7 @@ export default function PinSetup() {
         <div className="w-16 h-16 rounded-2xl bg-brand-pink/10 flex items-center justify-center mx-auto mb-4">
           <ShieldCheck className="w-8 h-8 text-brand-pink" strokeWidth={1.5} />
         </div>
-        <img src="/logo.png" alt="yayaa.bakes" className="h-8 mx-auto mb-1 object-contain" />
+        <img src="/logo-workmark.png" alt="yayaa.bakes" className="h-8 mx-auto mb-1 object-contain" />
         <p className={`text-sm font-medium ${step === 'mismatch' ? 'text-red-500' : 'text-brand-text/50'}`}>
           {label}
         </p>

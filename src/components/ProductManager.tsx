@@ -4,15 +4,16 @@ import { useState, useRef } from 'react'
 import { Pencil, Trash2, Plus, Check, X, Package, Camera } from 'lucide-react'
 import { addProduct, updateProduct, deleteProduct } from '@/lib/db'
 import { compressImage } from '@/lib/image'
+import { showToast } from '@/components/Toast'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import type { Product } from '@/lib/types'
 
 type Props = {
   products: Product[]
   onRefresh: () => void
-  showToast: (msg: string) => void
 }
 
-export default function ProductManager({ products, onRefresh, showToast }: Props) {
+export default function ProductManager({ products, onRefresh }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editPrice, setEditPrice] = useState('')
@@ -25,6 +26,7 @@ export default function ProductManager({ products, onRefresh, showToast }: Props
   const [newImage, setNewImage] = useState<string | null>(null)
   const [editImage, setEditImage] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const newFileRef = useRef<HTMLInputElement>(null)
   const editFileRef = useRef<HTMLInputElement>(null)
 
@@ -55,15 +57,17 @@ export default function ProductManager({ products, onRefresh, showToast }: Props
     }
   }
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
-    const ok = await deleteProduct(id)
-    if (ok) {
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    const { id, name } = deleteTarget
+    const result = await deleteProduct(id)
+    if (result.ok) {
       showToast(`${name} deleted`)
       onRefresh()
     } else {
-      showToast('Delete failed')
+      showToast(result.error || 'Delete failed')
     }
+    setDeleteTarget(null)
   }
 
   const handleAdd = async () => {
@@ -323,7 +327,7 @@ export default function ProductManager({ products, onRefresh, showToast }: Props
                       <Pencil className="w-3.5 h-3.5" strokeWidth={2} />
                     </button>
                     <button
-                      onClick={() => handleDelete(product.id, product.name)}
+                      onClick={() => setDeleteTarget({ id: product.id, name: product.name })}
                       className="w-8 h-8 rounded-lg bg-red-50 text-red-400 flex items-center justify-center active:bg-red-100 active:text-red-600 transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
@@ -335,6 +339,16 @@ export default function ProductManager({ products, onRefresh, showToast }: Props
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete Product"
+        message={`Delete "${deleteTarget?.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { X, Check, Loader2 } from 'lucide-react'
 import { CartProvider, useCart } from '@/hooks/useCart'
 import { PinProvider, usePinLock } from '@/hooks/usePinLock'
 import { fetchProducts, createSale, logWasteOrFreebie } from '@/lib/db'
+import { showToast } from '@/components/Toast'
 import type { Product, PaymentMethod, Tab } from '@/lib/types'
 import TabBar from '@/components/TabBar'
 import ProductGrid from '@/components/ProductGrid'
@@ -16,6 +17,7 @@ import ReconciliationDashboard from '@/components/ReconciliationDashboard'
 import ProductManager from '@/components/ProductManager'
 import PinSetup from '@/components/PinSetup'
 import PinEntry from '@/components/PinEntry'
+import { ToastContainer } from '@/components/Toast'
 
 const ADMIN_TABS: Tab[] = ['reconciliation', 'products']
 
@@ -46,20 +48,6 @@ function POSApp() {
   // Long press state
   const [longPressTarget, setLongPressTarget] = useState<Product | null>(null)
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 })
-
-  // Toast
-  const [toast, setToast] = useState<string | null>(null)
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout>>()
-
-  useEffect(() => {
-    return () => clearTimeout(toastTimerRef.current)
-  }, [])
-
-  const showToast = useCallback((msg: string) => {
-    setToast(msg)
-    clearTimeout(toastTimerRef.current)
-    toastTimerRef.current = setTimeout(() => setToast(null), 2000)
-  }, [])
 
   const loadProducts = useCallback(async () => {
     setLoading(true)
@@ -133,7 +121,7 @@ function POSApp() {
         showToast('Failed to log waste')
       }
     },
-    [updateLocalStock, showToast],
+    [updateLocalStock],
   )
 
   const handleFreebie = useCallback(
@@ -147,7 +135,7 @@ function POSApp() {
         showToast('Failed to log freebie')
       }
     },
-    [updateLocalStock, showToast],
+    [updateLocalStock],
   )
 
   // Checkout flow handlers
@@ -191,7 +179,7 @@ function POSApp() {
     } else {
       showToast('Checkout failed. Try again.')
     }
-  }, [cart, selectedPayment, dispatch, updateLocalStock, showToast])
+  }, [cart, selectedPayment, dispatch, updateLocalStock])
 
   const handleQrDone = useCallback(() => {
     executeCheckout()
@@ -216,9 +204,11 @@ function POSApp() {
       {/* LEFT PANEL — products, summary, product manager */}
       <div className="flex-1 md:w-[68%] flex flex-col min-w-0">
         <header className="bg-white border-b border-pink-100 px-4 py-3 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="yayaa.bakes" className="h-9 object-contain" />
-            <p className="text-[10px] text-[#333333]/40 font-medium">Micro-POS</p>
+          <div className="flex items-center gap-4">
+            <img src="/logo.png" alt="logo" className="w-14 h-14 rounded-xl object-cover shadow-sm shrink-0" />
+            <div className="flex flex-col">
+              <img src="/logo-workmark.png" alt="yayaa.bakes" className="h-14 object-contain" />
+            </div>
           </div>
           {activeTab === 'checkout' && cart.length > 0 && (
             <div className="bg-[#F89EAE] text-white text-xs font-bold px-3 py-1.5 rounded-full">
@@ -243,7 +233,7 @@ function POSApp() {
           )}
           {activeTab === 'reconciliation' && <ReconciliationDashboard />}
           {activeTab === 'products' && (
-            <ProductManager products={products} onRefresh={loadProducts} showToast={showToast} />
+            <ProductManager products={products} onRefresh={loadProducts} />
           )}
         </main>
       </div>
@@ -307,15 +297,9 @@ function POSApp() {
         <LongPressPopup product={longPressTarget} position={popupPosition} onWasted={handleWasted} onFreebie={handleFreebie} onClose={() => setLongPressTarget(null)} />
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] bg-[#333333] text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-lg animate-in slide-in-from-top-2 fade-in">
-          {toast}
-        </div>
-      )}
-
       {hasPin && !pinExists && <PinSetup />}
       {showPinEntry && <PinEntry onClose={handleClosePinEntry} onSuccess={onPinSuccess} />}
+      <ToastContainer />
     </div>
   )
 }
