@@ -149,7 +149,25 @@ DROP POLICY IF EXISTS "store_inventory_logs" ON inventory_logs;
 DROP POLICY IF EXISTS "store_session_modals" ON session_modals;
 
 -- ==========================================
--- 9. RPC: Safe stock deduction
+-- 8b. SESSIONS (daily open/close)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS sessions (
+  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  store_id             UUID          NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  opened_at            TIMESTAMPTZ   DEFAULT NOW(),
+  closed_at            TIMESTAMPTZ,
+  opening_float        DECIMAL(10,2) NOT NULL DEFAULT 0,
+  closing_cash_counted DECIMAL(10,2),
+  cash_sales_expected  DECIMAL(10,2),
+  discrepancy          DECIMAL(10,2),
+  status               TEXT          NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_store  ON sessions (store_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions (store_id, status);
+CREATE INDEX IF NOT EXISTS idx_sessions_date   ON sessions (store_id, opened_at);
+
+-- ==========================================
 -- ==========================================
 CREATE OR REPLACE FUNCTION deduct_stock(p_product_id UUID, p_quantity INTEGER)
 RETURNS VOID AS $$

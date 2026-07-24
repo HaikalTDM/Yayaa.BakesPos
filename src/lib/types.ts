@@ -92,3 +92,15 @@ export type ModalEntry = {
   note: string
   created_at: string
 }
+
+export type Session = {
+  id: string
+  store_id: string
+  opened_at: string
+  closed_at: string | null
+  opening_float: number
+  closing_cash_counted: number | null
+  cash_sales_expected: number | null
+  discrepancy: number | null
+  status: 'open' | 'closed'
+}

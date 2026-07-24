@@ -5,9 +5,9 @@ import { X, Check, Loader2, CakeSlice } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { CartProvider, useCart } from '@/hooks/useCart'
 import { PinProvider, usePinLock } from '@/hooks/usePinLock'
-import { fetchProducts, createSale, logWasteOrFreebie, restockProduct } from '@/lib/db'
+import { fetchProducts, createSale, logWasteOrFreebie, restockProduct, fetchCurrentSession } from '@/lib/db'
 import { showToast } from '@/components/Toast'
-import type { Product, PaymentMethod, Tab } from '@/lib/types'
+import type { Product, PaymentMethod, Tab, Session } from '@/lib/types'
 import TabBar from '@/components/TabBar'
 import ProductGrid from '@/components/ProductGrid'
 import CartPanel from '@/components/CartPanel'
@@ -18,6 +18,7 @@ import ReconciliationDashboard from '@/components/ReconciliationDashboard'
 import ProductManager from '@/components/ProductManager'
 import PinSetup from '@/components/PinSetup'
 import PinEntry from '@/components/PinEntry'
+import SessionManager from '@/components/SessionManager'
 import { ToastContainer } from '@/components/Toast'
 
 const ADMIN_TABS: Tab[] = ['reconciliation', 'products']
@@ -75,6 +76,10 @@ function POSApp() {
   const [longPressTarget, setLongPressTarget] = useState<Product | null>(null)
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 })
 
+  // Session state
+  const [currentSession, setCurrentSession] = useState<Session | null>(null)
+  const [sessionHydrated, setSessionHydrated] = useState(false)
+
   // Fly-to-cart animation state
   const [flyingProduct, setFlyingProduct] = useState<{
     product: Product
@@ -102,6 +107,11 @@ function POSApp() {
 
   useEffect(() => {
     loadProducts()
+    // Fetch current session on mount
+    fetchCurrentSession().then((s) => {
+      setCurrentSession(s)
+      setSessionHydrated(true)
+    })
   }, [loadProducts])
 
   const handleTabChange = useCallback((tab: Tab) => {
@@ -312,18 +322,24 @@ function POSApp() {
     setSelectedPayment(null)
   }, [])
 
+  // Low stock count
+  const lowStockCount = useMemo(() => products.filter((p) => p.stock > 0 && p.stock <= 3).length, [products])
+
+  // Cash sales today for session close
+  const cashSalesToday = 0 // TODO: fetch from DB — sum of cash sales in current session window
+
   return (
     <div className="min-h-dvh md:h-dvh flex flex-col md:flex-row md:overflow-hidden">
       {/* LEFT PANEL — products, summary, product manager */}
       <div className="flex-1 md:w-[68%] flex flex-col min-w-0">
         <header className="bg-white border-b border-pink-100 px-4 py-3 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <img src="/logo.png" alt="logo" className="w-14 h-14 rounded-xl object-cover shadow-sm shrink-0" />
             <div className="flex flex-col">
               <img src="/logo-workmark.png" alt="yayaa.bakes" className="h-14 object-contain" />
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {isUnlocked && ADMIN_TABS.includes(activeTab) && (
               <button
                 onClick={() => setShowChangePin(true)}
@@ -331,6 +347,18 @@ function POSApp() {
               >
                 Change PIN
               </button>
+            )}
+            {sessionHydrated && activeTab === 'checkout' && (
+              <SessionManager
+                session={currentSession}
+                onSessionChange={setCurrentSession}
+                cashSalesToday={cashSalesToday}
+              />
+            )}
+            {lowStockCount > 0 && activeTab === 'checkout' && (
+              <span className="text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-300 px-2 py-1 rounded-lg">
+                ⚠ {lowStockCount} low stock
+              </span>
             )}
             {activeTab === 'checkout' && cart.length > 0 && (
               <div className="bg-[#F89EAE] text-white text-xs font-bold px-3 py-1.5 rounded-full">

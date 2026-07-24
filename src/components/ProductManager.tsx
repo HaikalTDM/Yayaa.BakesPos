@@ -323,14 +323,25 @@ export default function ProductManager({ products, onRefresh }: Props) {
                       onChange={(e) => handleImagePick(e, false)}
                       className="hidden"
                     />
-                    <button
-                      type="button"
-                      onClick={() => editFileRef.current?.click()}
-                      disabled={uploading}
-                      className="text-xs font-semibold text-brand-pink active:opacity-70 disabled:opacity-50"
-                    >
-                      {uploading ? 'Compressing...' : editImage ? 'Change' : 'Add photo'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => editFileRef.current?.click()}
+                        disabled={uploading}
+                        className="text-xs font-semibold text-brand-pink active:opacity-70 disabled:opacity-50"
+                      >
+                        {uploading ? 'Compressing...' : editImage ? 'Change' : 'Add photo'}
+                      </button>
+                      {editImage && (
+                        <button
+                          type="button"
+                          onClick={() => setEditImage(null)}
+                          className="text-xs font-semibold text-red-400 active:opacity-70"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <input
                     type="text"

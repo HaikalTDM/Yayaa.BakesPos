@@ -1,5 +1,5 @@
 import { supabase, STORE_ID } from './supabase'
-import type { Product, CartItem, PaymentMethod, EnhancedStats, Period, ModalEntry, CategoryBreakdown } from './types'
+import type { Product, CartItem, PaymentMethod, EnhancedStats, Period, ModalEntry, CategoryBreakdown, Session, InventoryLog } from './types'
 
 export async function fetchProducts(): Promise<Product[]> {
   const { data, error } = await supabase
@@ -240,4 +240,88 @@ export async function clearAllStoreData(): Promise<void> {
   } catch (err: any) {
     console.error('Failed to clear store data:', err?.message || err)
   }
+}
+
+// ==========================================
+// SESSION MANAGEMENT
+// ==========================================
+
+export async function openSession(openingFloat: number): Promise<Session | null> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .insert({ store_id: STORE_ID, opening_float: openingFloat })
+    .select()
+    .single()
+
+  if (error) { console.error('Failed to open session:', error); return null }
+  return data as Session
+}
+
+export async function closeSession(
+  sessionId: string,
+  closingCashCounted: number,
+  cashSalesExpected: number,
+): Promise<boolean> {
+  const discrepancy = round(closingCashCounted - cashSalesExpected)
+  const { error } = await supabase
+    .from('sessions')
+    .update({
+      closed_at: new Date().toISOString(),
+      closing_cash_counted: closingCashCounted,
+      cash_sales_expected: cashSalesExpected,
+      discrepancy,
+      status: 'closed',
+    })
+    .eq('id', sessionId)
+
+  if (error) { console.error('Failed to close session:', error); return false }
+  return true
+}
+
+export async function fetchCurrentSession(): Promise<Session | null> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('store_id', STORE_ID)
+    .eq('status', 'open')
+    .order('opened_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) { console.error('Failed to fetch current session:', error); return null }
+  return data as Session | null
+}
+
+export async function fetchRecentRestocks(limit = 20): Promise<(InventoryLog & { product_name?: string })[]> {
+  const { data, error } = await supabase
+    .from('inventory_logs')
+    .select('*, products(name)')
+    .eq('store_id', STORE_ID)
+    .eq('reason', 'restock')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) { console.error('Failed to fetch restocks:', error); return [] }
+  return (data ?? []).map((r: any) => ({ ...r, product_name: r.products?.name ?? '—' }))
+}
+
+export async function fetchSalesForExport(period: Period): Promise<any[]> {
+  const { start, end } = getPeriodRange(period)
+  const { data, error } = await supabase
+    .from('sale_items')
+    .select('quantity, price_at_sale, product_id, sale_id, products(name, category), sales(created_at, payment_method)')
+    .eq('products.store_id', STORE_ID)
+    .gte('sales.created_at', start)
+    .lt('sales.created_at', end)
+    .order('created_at', { foreignTable: 'sales', ascending: false })
+
+  if (error) { console.error('Failed to fetch sales for export:', error); return [] }
+  return (data ?? []).map((item: any) => ({
+    date: item.sales?.created_at?.split('T')[0] ?? '—',
+    product: item.products?.name ?? '—',
+    category: item.products?.category ?? '—',
+    quantity: item.quantity,
+    revenue: item.price_at_sale * item.quantity,
+    payment: item.sales?.payment_method ?? '—',
+  }))
 }
