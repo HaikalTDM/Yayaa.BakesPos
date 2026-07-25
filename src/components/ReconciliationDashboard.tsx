@@ -5,7 +5,7 @@ import {
   RefreshCw, Plus, TrendingUp, ShoppingBag,
   DollarSign, AlertTriangle, Trash2,
 } from 'lucide-react'
-import { fetchStats, addModalEntry, fetchModalEntries, clearAllStoreData } from '@/lib/db'
+import { fetchStats, addModalEntry, fetchModalEntries, clearAllStoreData, fetchSaleHistory } from '@/lib/db'
 import type { EnhancedStats, Period, ModalEntry } from '@/lib/types'
 
 import ConfirmDialog from '@/components/ConfirmDialog'
@@ -26,15 +26,19 @@ export default function ReconciliationDashboard() {
   const [modalEntries, setModalEntries] = useState<ModalEntry[]>([])
   const [saving, setSaving] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [saleHistory, setSaleHistory] = useState<any[]>([])
+  const [showAllHistory, setShowAllHistory] = useState(false)
 
   const loadAll = useCallback(async () => {
     setLoading(true)
-    const [data, entries] = await Promise.all([
+    const [data, entries, history] = await Promise.all([
       fetchStats(period),
       fetchModalEntries(),
+      fetchSaleHistory(period),
     ])
     setStats(data)
     setModalEntries(entries)
+    setSaleHistory(history)
     setLoading(false)
   }, [period])
 
@@ -235,6 +239,46 @@ export default function ReconciliationDashboard() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Sales History */}
+      {saleHistory.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+          <p className="text-xs font-semibold text-slate-500 mb-3">
+            Sales History
+            <span className="text-slate-300 ml-1">({saleHistory.length})</span>
+          </p>
+          <div className="space-y-2">
+            {saleHistory.slice(0, showAllHistory ? undefined : 5).map((sale: any) => (
+              <div
+                key={sale.id}
+                className="flex items-center justify-between gap-2 py-1.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-slate-400 tabular-nums">{sale.date}</span>
+                    <span className="text-[10px] text-slate-300 tabular-nums">{sale.time}</span>
+                  </div>
+                  <p className="text-xs font-medium text-slate-700 truncate">{sale.products}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs font-extrabold text-slate-800 tabular-nums">RM {sale.total.toFixed(2)}</p>
+                  <span className={`text-[10px] font-semibold ${sale.payment === 'cash' ? 'text-emerald-600' : 'text-indigo-600'}`}>
+                    {sale.payment === 'cash' ? 'Cash' : 'DuitNow'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {saleHistory.length > 5 && (
+            <button
+              onClick={() => setShowAllHistory(!showAllHistory)}
+              className="w-full mt-3 py-2 rounded-xl text-[11px] font-semibold text-brand-pink active:bg-brand-pink/5 transition-colors"
+            >
+              {showAllHistory ? 'Show less' : `Show all ${saleHistory.length} sales`}
+            </button>
+          )}
         </div>
       )}
 

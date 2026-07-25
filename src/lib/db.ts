@@ -97,7 +97,7 @@ export async function fetchStats(period: Period): Promise<EnhancedStats> {
   try {
     const { data: sales, error: salesErr } = await supabase
       .from('sales')
-      .select('total, payment_method')
+      .select('id, total, payment_method')
       .eq('store_id', STORE_ID)
       .eq('status', 'received')
       .gte('created_at', start)
@@ -128,21 +128,59 @@ export async function fetchStats(period: Period): Promise<EnhancedStats> {
     const { data: products } = await supabase.from('products').select('*').eq('store_id', STORE_ID)
     const lowStock = (products ?? []).filter((p: Product) => p.stock <= 3).map((p: Product) => ({ name: p.name, stock: p.stock }))
 
+    // Category breakdown — join sale_items with products to get real revenue per category
     const catMap = new Map<string, number>()
     for (const p of (products ?? [])) { catMap.set(p.category, 0) }
-    const { data: topItems } = await supabase
-      .from('sale_items')
-      .select('product_id, quantity')
-      .in('sale_id', sales.map((s: any) => s.id).length ? [] : [])
-    // Note: accurate per-category breakdown requires joining sale_items with products
-    // For simplicity, show categories with $0 until the sales query above is expanded
+
+    if (sales.length > 0) {
+      const saleIds = sales.map((s: any) => s.id)
+      const { data: items } = await supabase
+        .from('sale_items')
+        .select('quantity, price_at_sale, products(category)')
+        .in('sale_id', saleIds)
+
+      if (items) {
+        for (const item of items) {
+          const cat = (item as any).products?.category ?? 'Uncategorized'
+          const revenue = item.quantity * item.price_at_sale
+          catMap.set(cat, (catMap.get(cat) ?? 0) + revenue)
+        }
+      }
+    }
+
+    // Find top product
+    const productSales = new Map<string, number>()
+    if (sales.length > 0) {
+      const saleIds = sales.map((s: any) => s.id)
+      const { data: items } = await supabase
+        .from('sale_items')
+        .select('quantity, product_id, products(name)')
+        .in('sale_id', saleIds)
+
+      if (items) {
+        for (const item of items) {
+          const name = (item as any).products?.name ?? '—'
+          productSales.set(name, (productSales.get(name) ?? 0) + item.quantity)
+        }
+      }
+    }
+    const topProduct = productSales.size > 0
+      ? [...productSales.entries()].sort((a, b) => b[1] - a[1])[0][0]
+      : '—'
+
+    const catTotal = [...catMap.values()].reduce((s, v) => s + v, 0)
+    const categoryBreakdown = [...catMap.entries()].map(([category, amount]) => ({
+      category,
+      amount: round(amount),
+      pct: catTotal > 0 ? round((amount / catTotal) * 100) : 0,
+    }))
 
     return {
       grossSales, cashTotal: round(cashTotal), duitnowTotal: round(duitnowTotal),
       totalModal: modalTotal, netProfit: round(grossSales - modalTotal), saleCount,
       avgOrderValue: saleCount > 0 ? round(grossSales / saleCount) : 0,
-      topProduct: '—', cashPct, duitnowPct,
-      categoryBreakdown: Array.from(catMap.entries()).map(([c]) => ({ category: c, amount: 0, pct: 0 })),
+      topProduct, cashPct, duitnowPct,
+      categoryBreakdown,
       lowStockProducts: lowStock,
     }
   } catch (err: any) {
@@ -303,6 +341,44 @@ export async function fetchRecentRestocks(limit = 20): Promise<(InventoryLog & {
 
   if (error) { console.error('Failed to fetch restocks:', error); return [] }
   return (data ?? []).map((r: any) => ({ ...r, product_name: r.products?.name ?? '—' }))
+}
+
+export async function fetchSaleHistory(period: Period): Promise<any[]> {
+  const { start, end } = getPeriodRange(period)
+  const { data, error } = await supabase
+    .from('sales')
+    .select('id, total, payment_method, created_at, sale_items(quantity, price_at_sale, products(name))')
+    .eq('store_id', STORE_ID)
+    .eq('status', 'received')
+    .gte('created_at', start)
+    .lt('created_at', end)
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  if (error) { console.error('Failed to fetch sale history:', error); return [] }
+
+  return (data ?? []).map((sale: any) => {
+    const items = sale.sale_items ?? []
+    const productNames = items.map((si: any) => si.products?.name ?? '—').join(', ')
+    const totalQty = items.reduce((sum: number, si: any) => sum + si.quantity, 0)
+    const time = sale.created_at
+      ? new Date(sale.created_at).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', hour12: true })
+      : '--:--'
+    const date = sale.created_at
+      ? new Date(sale.created_at).toLocaleDateString('en-MY', { month: 'short', day: 'numeric' })
+      : '—'
+
+    return {
+      id: sale.id,
+      date,
+      time,
+      products: productNames,
+      qty: totalQty,
+      total: sale.total,
+      payment: sale.payment_method as string,
+      created_at: sale.created_at,
+    }
+  })
 }
 
 export async function fetchSalesForExport(period: Period): Promise<any[]> {
