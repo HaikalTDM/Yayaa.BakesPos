@@ -5,7 +5,7 @@ import { X, Check, Loader2, CakeSlice } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { CartProvider, useCart } from '@/hooks/useCart'
 import { PinProvider, usePinLock } from '@/hooks/usePinLock'
-import { fetchProducts, createSale, logWasteOrFreebie, restockProduct, fetchCurrentSession } from '@/lib/db'
+import { fetchProducts, createSale, logWasteOrFreebie, restockProduct, fetchCurrentSession, fetchCashSalesToday } from '@/lib/db'
 import { showToast } from '@/components/Toast'
 import type { Product, PaymentMethod, Tab, Session } from '@/lib/types'
 import TabBar from '@/components/TabBar'
@@ -325,9 +325,6 @@ function POSApp() {
   // Low stock count
   const lowStockCount = useMemo(() => products.filter((p) => p.stock > 0 && p.stock <= 3).length, [products])
 
-  // Cash sales today for session close
-  const cashSalesToday = 0 // TODO: fetch from DB — sum of cash sales in current session window
-
   return (
     <div className="min-h-dvh md:h-dvh flex flex-col md:flex-row md:overflow-hidden">
       {/* LEFT PANEL — products, summary, product manager */}
@@ -352,7 +349,6 @@ function POSApp() {
               <SessionManager
                 session={currentSession}
                 onSessionChange={setCurrentSession}
-                cashSalesToday={cashSalesToday}
               />
             )}
             {lowStockCount > 0 && activeTab === 'checkout' && (

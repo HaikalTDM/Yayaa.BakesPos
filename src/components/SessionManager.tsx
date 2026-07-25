@@ -2,30 +2,37 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { Clock, DollarSign, X, AlertTriangle } from 'lucide-react'
-import { openSession, closeSession, fetchCurrentSession } from '@/lib/db'
+import { openSession, closeSession, fetchCurrentSession, fetchCashSalesToday } from '@/lib/db'
 import { showToast } from '@/components/Toast'
 import type { Session } from '@/lib/types'
 
 type Props = {
   session: Session | null
   onSessionChange: (s: Session | null) => void
-  cashSalesToday: number
 }
 
-export default function SessionManager({ session, onSessionChange, cashSalesToday }: Props) {
+export default function SessionManager({ session, onSessionChange }: Props) {
   const [showOpenModal, setShowOpenModal] = useState(false)
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [openingFloat, setOpeningFloat] = useState('50')
   const [closingCashCounted, setClosingCashCounted] = useState('')
   const [loading, setLoading] = useState(false)
+  const [cashSalesToday, setCashSalesToday] = useState(0)
 
   const cashSalesExpected = (session?.opening_float ?? 0) + cashSalesToday
 
+  // Fetch cash sales when close modal opens
   useEffect(() => {
-    if (session) {
+    if (showCloseModal && session?.opened_at) {
+      fetchCashSalesToday(session.opened_at).then(setCashSalesToday)
+    }
+  }, [showCloseModal, session])
+
+  useEffect(() => {
+    if (session && showCloseModal) {
       setClosingCashCounted(cashSalesExpected.toFixed(2))
     }
-  }, [session, cashSalesExpected])
+  }, [session, cashSalesExpected, showCloseModal])
 
   const handleOpen = useCallback(async () => {
     const amount = parseFloat(openingFloat)
@@ -117,7 +124,7 @@ export default function SessionManager({ session, onSessionChange, cashSalesToda
         className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-green-100 border border-green-300 text-green-800 text-[10px] font-bold active:bg-green-200 transition-colors"
       >
         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-        Session open
+        Session open · Float RM {session.opening_float.toFixed(2)}
       </button>
 
       {showCloseModal && (

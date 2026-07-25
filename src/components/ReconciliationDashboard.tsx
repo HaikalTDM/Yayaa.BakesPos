@@ -5,8 +5,8 @@ import {
   RefreshCw, Plus, TrendingUp, ShoppingBag,
   DollarSign, AlertTriangle, Trash2,
 } from 'lucide-react'
-import { fetchStats, addModalEntry, fetchModalEntries, clearAllStoreData, fetchSaleHistory } from '@/lib/db'
-import type { EnhancedStats, Period, ModalEntry } from '@/lib/types'
+import { fetchStats, addModalEntry, fetchModalEntries, clearAllStoreData, fetchSaleHistory, fetchSessionHistory } from '@/lib/db'
+import type { EnhancedStats, Period, ModalEntry, Session } from '@/lib/types'
 
 import ConfirmDialog from '@/components/ConfirmDialog'
 
@@ -28,17 +28,20 @@ export default function ReconciliationDashboard() {
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [saleHistory, setSaleHistory] = useState<any[]>([])
   const [showAllHistory, setShowAllHistory] = useState(false)
+  const [sessionHistory, setSessionHistory] = useState<Session[]>([])
 
   const loadAll = useCallback(async () => {
     setLoading(true)
-    const [data, entries, history] = await Promise.all([
+    const [data, entries, history, sessions] = await Promise.all([
       fetchStats(period),
       fetchModalEntries(),
       fetchSaleHistory(period),
+      fetchSessionHistory(),
     ])
     setStats(data)
     setModalEntries(entries)
     setSaleHistory(history)
+    setSessionHistory(sessions)
     setLoading(false)
   }, [period])
 
@@ -238,6 +241,44 @@ export default function ReconciliationDashboard() {
                 <span className="text-rose-600 font-bold">{p.stock} pcs left</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Session History */}
+      {sessionHistory.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+          <p className="text-xs font-semibold text-slate-500 mb-3">
+            Session History
+            <span className="text-slate-300 ml-1">({sessionHistory.length})</span>
+          </p>
+          <div className="space-y-2">
+            {sessionHistory.map((s) => {
+              const date = new Date(s.opened_at).toLocaleDateString('en-MY', { month: 'short', day: 'numeric' })
+              const openTime = new Date(s.opened_at).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })
+              const closeTime = s.closed_at
+                ? new Date(s.closed_at).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })
+                : '—'
+              const disc = s.discrepancy ?? 0
+              return (
+                <div key={s.id} className="py-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-slate-600">{date}</span>
+                      <span className="text-[10px] text-slate-300">{openTime} – {closeTime}</span>
+                    </div>
+                    <span className={`text-[10px] font-bold ${disc >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {disc >= 0 ? 'Over' : 'Short'} RM {Math.abs(disc).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 text-[10px] text-slate-400 mt-0.5">
+                    <span>Float RM {s.opening_float.toFixed(2)}</span>
+                    <span>→ Expected RM {(s.cash_sales_expected ?? 0).toFixed(2)}</span>
+                    <span>→ Counted RM {(s.closing_cash_counted ?? 0).toFixed(2)}</span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

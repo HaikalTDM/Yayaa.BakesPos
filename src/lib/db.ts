@@ -330,6 +330,33 @@ export async function fetchCurrentSession(): Promise<Session | null> {
   return data as Session | null
 }
 
+export async function fetchSessionHistory(limit = 20): Promise<Session[]> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('store_id', STORE_ID)
+    .eq('status', 'closed')
+    .order('opened_at', { ascending: false })
+    .limit(limit)
+
+  if (error) { console.error('Failed to fetch session history:', error); return [] }
+  return data as Session[]
+}
+
+export async function fetchCashSalesToday(sessionOpenedAt: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('sales')
+    .select('total')
+    .eq('store_id', STORE_ID)
+    .eq('status', 'received')
+    .eq('payment_method', 'cash')
+    .gte('created_at', sessionOpenedAt)
+    .lt('created_at', new Date().toISOString())
+
+  if (error || !data) return 0
+  return data.reduce((sum, s) => sum + (s.total as number), 0)
+}
+
 export async function fetchRecentRestocks(limit = 20): Promise<(InventoryLog & { product_name?: string })[]> {
   const { data, error } = await supabase
     .from('inventory_logs')
